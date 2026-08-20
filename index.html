@@ -1,6 +1,7 @@
 <!doctype html><html lang=ja><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>発注アプリ v3.6.1 (Layout Fixed)</title>
+<title>発注アプリ v3.6.2 (Fixed & Cam)</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{color-scheme:light;--bg:#f9f9f7;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8b8a84;
 --bd:rgba(11,11,11,.12);--grid:#e6e5df;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#c9a227;--crit:#d64545}
@@ -39,6 +40,7 @@ white-space:nowrap}
 button.gh,.btn-label.gh{background:var(--card);color:var(--ink2);border-color:var(--bd);font-weight:500}
 button.sm,.btn-label.sm{padding:6px 8px;font-size:12px}
 button.cloud{background:#0f9d58;border-color:#0f9d58;color:#fff}
+button[aria-pressed=true]{background:var(--s1);color:#fff;border-color:var(--s1)}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .modes{display:inline-flex;border:1px solid var(--bd);border-radius:9px;overflow:hidden;margin-bottom:10px}
 .modes button{border:0;border-radius:0;background:var(--card);color:var(--ink2);font-weight:500;padding:8px 13px}
@@ -132,12 +134,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </div>
 
 <div class=card>
-<h2><span class=n>3</span>履歴・書き出し</h2>
+<h2><span class=n>3</span>履歴・連携・カメラ</h2>
 <div class=btns><button class="gh sm" onclick="openHist()">＋実績記録</button>
-<button class=sm onclick="outPrompt()">AIプロンプト</button>
-<button class="gh sm" onclick="outCompact()">短文送信</button>
-<button class="gh sm" onclick="saveFile()">保存</button>
+<button class=sm onclick="outPrompt()">AI分析</button>
+<button class="gh sm" onclick="outFull()">バックアップ</button>
+<button class="gh sm" onclick="dlg('dImp')">読込</button>
+<label class="btn-label gh sm">📷 写真読取
+<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+</label>
 </div>
+<textarea id=out readonly></textarea>
 </div>
 </div>
 
@@ -182,11 +188,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <div id=setbody></div>
 <div class=btns style="margin-top:12px"><button class=gh onclick="document.getElementById('dSet').close()">閉じる</button></div></dialog>
 
+<dialog id=dImp><h2>読み込み</h2>
+<textarea id=impbox></textarea>
+<div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
+<button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
+
 <script>
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url';
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
-
 const GEN=[['onigiri','おむすび','🍙'],['sushi','寿司','🍣'],['bento','弁当','🍱'],['chilled','チルド弁当','🧊'],
 ['pasta','パスタ','🍝'],['hiyashi','冷やし麺','🍧'],['hotmen','ホット麺','🍜'],['yakimen','焼麺','🍳'],
 ['salad','サラダ','🥗'],['sand','サンドイッチ','🥪'],['sozai','惣菜','🍢'],['other','その他','📦']];
@@ -220,6 +230,14 @@ function cloudLoad(){
   const s=document.createElement('script');s.src=url+'?callback='+cb;
   document.body.appendChild(s);setTimeout(()=>{if(window[cb])flash('失敗')},5000)}
 
+async function handleImage(input){
+  if(!input.files||!input.files[0])return;
+  $('st').textContent='解析中...';
+  const {data:{text}}=await Tesseract.recognize(input.files[0],'jpn+eng');
+  $('out').value=text;
+  flash('解析完了');
+}
+
 function renderAll(){renderTabs();renderItems();renderHist();renderSetup()}
 function renderTabs(){const el=$('tabs');el.textContent='';
   GEN.forEach(([k,n,ic])=>{const b=document.createElement('button');b.className='tab';
@@ -237,8 +255,8 @@ function renderItems(){const B=$('itb');B.textContent='';
 }
 function setV(id,i,v){G().cur.v[id]=G().cur.v[id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
   G().cur.v[id][MODE][i]=+v||null;save();renderItems()}
-function renderHist(){} // 省略
-function renderSetup(){} // 省略
+function renderHist(){} 
+function renderSetup(){}
 function renderSet(){$('gas_url').value=getGasUrl()}
 
 if(!load())DB=fresh();
