@@ -61,12 +61,13 @@ async function fetchWeather(){
   const dateStr=y+'-'+String(mo).padStart(2,'0')+'-'+String(da).padStart(2,'0');
   flash('天気を取得中...');
   try{
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weathercode&timezone=Asia%2FTokyo&start_date=${dateStr}&end_date=${dateStr}`;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=weathercode&timezone=Asia%2FTokyo&start_date=${dateStr}&end_date=${dateStr}`;
     const res=await fetch(url);
     const data=await res.json();
-    const code=data.daily&&data.daily.weathercode&&data.daily.weathercode[0];
-    if(code==null){alert('天気予報の取得範囲外でした（直近16日以内の日付のみ対応）');flash('取得失敗');return}
-    $('wthr').value=wmoLabel(code);
+    const codes=data.hourly&&data.hourly.weathercode;
+    if(!codes||codes.length<18){alert('天気予報の取得範囲外でした（直近16日以内の日付のみ対応）');flash('取得失敗');return}
+    // 朝(7時=1便の売れ筋帯)/昼(12時=2便)/夕(17時=3便)の3時点で代表させる
+    $('wthr').value=`朝${wmoLabel(codes[7])}/昼${wmoLabel(codes[12])}/夕${wmoLabel(codes[17])}`;
     G().cur.wthr=$('wthr').value;renderSetup();autosave();
     flash('天気を取得しました');
   }catch(e){alert('天気の取得に失敗しました。通信環境をご確認ください');flash('取得失敗')}
@@ -192,7 +193,11 @@ function dowInfo(){const d=dowOf($('dt').value);if(!d)return null;
   const f=(L&&L.f[d])||g.dow[d]||1, src=(L&&L.f[d])?('自店'+L.cnt[d]+'日から学習'):'初期値';
   const r=d==='土'?g.rat.sat:d==='日'?g.rat.sun:g.rat.weekday;
   return{d,f,r,src,type:d==='土'?'土曜型':d==='日'?'日曜型':'平日型'}}
-function weatherFactor(t){t=(t||'').trim();
+const WTHR_F={'晴':1.05,'曇':0.97,'雨':0.90,'雪':0.82};
+function weatherFactor(t,r){t=(t||'').trim();if(!t)return 1;
+  const m=t.match(/朝(晴|曇|雨|雪).*昼(晴|曇|雨|雪).*夕(晴|曇|雨|雪)/);
+  if(m){const w=r?[r[0]/100,r[1]/100,r[2]/100]:[1/3,1/3,1/3];
+    return WTHR_F[m[1]]*w[0]+WTHR_F[m[2]]*w[1]+WTHR_F[m[3]]*w[2]}
   if(/雪/.test(t))return 0.82;
   if(/雨/.test(t))return 0.90;
   if(/曇/.test(t))return 0.97;
@@ -203,7 +208,7 @@ function demand(){
   let b=Number(g.base)||0; if(!b)return null;
   let up=Number(g.up)||1;
   if(DB.active==='chilled'&&i.d==='月'){up*=1.5}
-  const wf=weatherFactor($('wthr').value);
+  const wf=weatherFactor($('wthr').value,i.r);
   return{q:Math.round(b*i.f*up*wf),
     src:`週平均${b}個 × ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')+(wf!==1?` × 天気${wf.toFixed(2)}`:'')}}
 function applyDow(){const i=dowInfo();if(!i)return null;
