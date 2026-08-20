@@ -143,13 +143,20 @@ function dowInfo(){const d=dowOf($('dt').value);if(!d)return null;
   const f=(L&&L.f[d])||g.dow[d]||1, src=(L&&L.f[d])?('自店'+L.cnt[d]+'日から学習'):'初期値';
   const r=d==='土'?g.rat.sat:d==='日'?g.rat.sun:g.rat.weekday;
   return{d,f,r,src,type:d==='土'?'土曜型':d==='日'?'日曜型':'平日型'}}
+function weatherFactor(t){t=(t||'').trim();
+  if(/雪/.test(t))return 0.82;
+  if(/雨/.test(t))return 0.90;
+  if(/曇/.test(t))return 0.97;
+  if(/晴/.test(t))return 1.05;
+  return 1}
 function demand(){
   const g=G(),i=dowInfo();if(!i)return null;
   let b=Number(g.base)||0; if(!b)return null;
   let up=Number(g.up)||1;
   if(DB.active==='chilled'&&i.d==='月'){up*=1.5}
-  return{q:Math.round(b*i.f*up),
-    src:`週平均${b}個 × ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')}}
+  const wf=weatherFactor($('wthr').value);
+  return{q:Math.round(b*i.f*up*wf),
+    src:`週平均${b}個 × ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')+(wf!==1?` × 天気${wf.toFixed(2)}`:'')}}
 function applyDow(){const i=dowInfo();if(!i)return null;
   $('r1').value=i.r[0];$('r2').value=i.r[1];$('r3').value=i.r[2];return i}
 function tgtKey(){const m=($('dt').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);return m?(+m[1]+'/'+ +m[2]):null}
@@ -207,10 +214,16 @@ function renderSetup(){
     ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
     ['今朝の棚',carry?carry+'個（配分の目標数から差し引きます）':'数えたら入力',carry?'ok':'warn'],
-    ['今日の需要見込み',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
+    ['今日の需要見込み（提案数）',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
     ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
   if(sp)rows.splice(2,0,['特殊カレンダー',`${sp}期間：ストコンAIの学習対象外のため意思入れ必須`,'crit']);
+  const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
+  if(aiT&&dem){
+    const diff=Math.round((dem-aiT)/aiT*100);
+    const close=Math.abs(diff)<=15;
+    rows.splice(rows.length-1,0,['提案数とストコンAIの差',`提案${dem}個 / AI${aiT}個（${diff>0?'+':''}${diff}%）${close?'・近い':'・差が大きい'}`,close?'ok':'warn']);
+  }
   const B=$('setup');B.textContent='';
   rows.forEach(([a,c,st])=>{const w=document.createElement('div');w.className='row';
     const x=document.createElement('div');x.className='k';x.textContent=a;
@@ -334,6 +347,9 @@ function renderHist(){const B=$('htb');B.textContent='';
 
 function renderAll(){renderTabs();
   const g=G();$('dt').value=g.cur.dt||'';$('carry').value=g.cur.carry??'';
+  $('wthr').value=g.cur.wthr||'';
+  const ai=g.cur.ai||[null,null,null];
+  $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
   applyDow();renderItems();renderHist();renderSetup()}
 
 /* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
@@ -510,7 +526,9 @@ function outPrompt(){
     ...(sp?[`⚠ 特殊カレンダー: ${sp}期間（ストコンAIの学習対象外のため参考程度に）`]:[]),
     `ストコンAI採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
     `本部目標: ${t?t.q+'個 / '+(t.a||0).toLocaleString()+'円':'未設定'}`,
-    `需要見込み: ${D?D.q+'個 ('+D.src+')':'未設定'}`,
+    `需要見込み(提案数): ${D?D.q+'個 ('+D.src+')':'未設定'}`,
+    ...((()=>{const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
+      return aiT?[`ストコンAI推奨合計(推奨値反映): ${aiT}個（1便${$('ai1').value||0}/2便${$('ai2').value||0}/3便${$('ai3').value||0}）`]:[]})()),
     `発注合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
     `今朝の棚 総数: ${carry}個`,
     `\n## 直近の実績推移`,
@@ -550,9 +568,13 @@ function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
     renderAll();flash('読み込みました')}catch(e){alert('読み込めませんでした')}}
 
 /* ---------- 起動 ---------- */
-['dt','carry'].forEach(id=>$(id).addEventListener('input',()=>{
+['dt','carry','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.dt=$('dt').value;G().cur.carry=$('carry').value===''?null:Number($('carry').value);
+  G().cur.wthr=$('wthr').value;
   if(id==='dt'){applyDow();$('tq').value='';$('ta').value=''}
+  renderSetup();autosave()}));
+['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
+  G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
   renderSetup();autosave()}));
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
