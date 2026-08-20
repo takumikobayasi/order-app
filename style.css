@@ -64,6 +64,8 @@ tr.sum td{font-weight:700;background:var(--bg);border-top:2px solid var(--bd);fo
 .stoconai{color:var(--s3)}
 button.stoconai,.btn-label.stoconai{background:var(--card);color:var(--s3);border-color:var(--s3)}
 #m_i[aria-pressed=true]{background:var(--s3);color:#fff;border-color:var(--s3)}
+button.wastemode{color:var(--crit);border-color:var(--crit)}
+#m_w[aria-pressed=true]{background:var(--crit);color:#fff;border-color:var(--crit)}
 .row-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 16px;margin-top:6px}
 .row{display:flex;flex-wrap:wrap;gap:4px 8px;padding:5px 0;border-bottom:1px solid var(--grid)}
 .row .k{color:var(--muted);flex:0 0 88px;font-size:12px}
@@ -76,6 +78,12 @@ padding:9px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);co
 padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;z-index:40;max-width:1100px;margin:0 auto;align-items:center}
 .foot button{flex:1; white-space:nowrap; padding:8px 2px; font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis}
 @media (max-width:380px){.foot button{font-size:11px; padding:8px 1px}.st{width:70px; font-size:10px}}
+@media (max-width:480px){
+  .col-other{display:none}
+  #itb input{width:44px;padding:6px 2px;font-size:15px}
+  th,td{padding:5px 2px}
+  .gr{width:18px;height:18px;line-height:18px;font-size:10px}
+}
 .st{width:85px; flex-shrink:0; font-size:11px; color:var(--s3); font-weight:600; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* ★ ここまで */
 
