@@ -143,7 +143,7 @@ function getAiAdoption(){
   if(!total) return null;
   const rate=Math.round((match/total)*100);
   let label='適正（利益最大ゾーン 70-80%）', cls='ok';
-  if(rate>85){label='AI依存過多（利益低下リスク）';cls='crit'}
+  if(rate>85){label='ストコンAI依存過多（利益低下リスク）';cls='crit'}
   else if(rate<65){label='意思入れ強め';cls='warn'}
   return {rate,label,cls,match,total};
 }
@@ -177,7 +177,7 @@ function renderSetup(){
     ['納品日',$('dt').value.trim()||'未入力',$('dt').value.trim()?'':'warn'],
     ['曜日係数',i?`${i.d}曜 ${i.f.toFixed(2)}（${i.src}）`:'納品日を入れてください',i?'':'warn'],
     ['便構成比',i?`${i.type} ${i.r[0]}/${i.r[1]}/${i.r[2]}%`:'—',i?'ok':'warn'],
-    ['AI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'AI推奨未入力',aiAdp?aiAdp.cls:'warn'],
+    ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
     ['今朝の棚',carry?carry+'個':'数えたら入力',carry?'ok':'warn'],
     ['今日の需要見込み',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
@@ -463,24 +463,24 @@ function outPrompt(){
   const D=demand(), aiAdp=getAiAdoption();
   const ch=[];g.items.forEach(r=>{
     const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
-    if(Math.abs(a-b)>=2&&(a||b))ch.push(`${r.name}: AI推奨${b}個 → 自店発注${a}個 (日販${r.day||0})`)});
+    if(Math.abs(a-b)>=2&&(a||b))ch.push(`${r.name}: ストコンAI推奨${b}個 → 自店発注${a}個 (日販${r.day||0})`)});
   const h=g.hist.slice(-4).map(x=>`- ${x.d}(${x.w||'天気不明'}): 納品${x.n??'-'} / 販売${x.s??'-'} / 廃棄${x.ha??'-'} (消化率:${x.n&&x.s?(x.s/x.n*100).toFixed(0)+'%':'-'})${x.m?' ['+x.m+']':''}`);
   
   const p=[
     `【発注アドバイス依頼】`,
     `対象カテゴリ: ${g.name}`,
     `対象日: ${dv}${i?' ('+i.d+'曜・係数'+i.f.toFixed(2)+')':''}`,
-    `AI推奨採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
+    `ストコンAI採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
     `本部目標: ${t?t.q+'個 / '+(t.a||0).toLocaleString()+'円':'未設定'}`,
     `需要見込み: ${D?D.q+'個 ('+D.src+')':'未設定'}`,
     `発注合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
     `今朝の棚 総数: ${carry}個`,
     `\n## 直近の実績推移`,
     h.length?h.join('\n'):'実績データなし',
-    `\n## AI推奨からの主な変更商品（±2個以上）`,
+    `\n## ストコンAI推奨からの主な変更商品（±2個以上）`,
     ch.length?ch.join('\n'):'大きな変更なし',
     `\n## 相談内容`,
-    `ファミマ発注マニュアルの「AI採用率70-80%最適化」および「主力品への売場ボリューム集中」を踏まえ、上記の発注バランスに機会ロスや過剰廃棄のリスクがないか評価・改善提案をお願いします。`
+    `ファミマ発注マニュアルの「ストコンAI採用率70-80%最適化」および「主力品への売場ボリューム集中」を踏まえ、上記の発注バランスに機会ロスや過剰廃棄のリスクがないか評価・改善提案をお願いします。`
   ];
   $('out').value=p.join('\n');
 }
@@ -490,14 +490,14 @@ function outCompact(){const g=G(),s=sums('o'),ai=sums('i'),ac=sums('a');
   const L=[`#${g.name} ${dv}${(i&&!/[月火水木金土日]/.test(dv))?'('+i.d+')':''}`];
   if(t)L.push(`目標 ${t.q}個 ${t.a}円`);
   if(s.T)L.push(`発注 ${s.b.join('/')}=${s.T} ${s.amt}円`);
-  if(ai.T)L.push(`AI ${ai.b.join('/')}=${ai.T}${aiAdp?' (採用率'+aiAdp.rate+'%)':''}`);
+  if(ai.T)L.push(`ストコンAI ${ai.b.join('/')}=${ai.T}${aiAdp?' (採用率'+aiAdp.rate+'%)':''}`);
   if(carry)L.push(`今朝の棚 ${carry}`);
   if(ac.T)L.push(`実績 納品/販売/廃棄 ${ac.b.join('/')}`);
   const ch=[];g.items.forEach(r=>{const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),
     b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
     if(Math.abs(a-b)>=3&&(a||b))ch.push({n:r.name,d:a-b,t:`${r.name}${b}→${a}`})});
   ch.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
-  if(ch.length)L.push('AI比±3以上 '+ch.slice(0,8).map(x=>x.t).join(' ')+(ch.length>8?` 他${ch.length-8}品`:''));
+  if(ch.length)L.push('ストコンAI比±3以上 '+ch.slice(0,8).map(x=>x.t).join(' ')+(ch.length>8?` 他${ch.length-8}品`:''));
   const h=g.hist.slice(-3).map(x=>`${x.d} 納${x.n??'-'} 販${x.s??'-'} 廃${x.ha??'-'}${x.w?' '+x.w:''}`);
   if(h.length)L.push('直近 '+h.join(' | '));
   $('out').value=L.join('\n')}

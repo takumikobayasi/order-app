@@ -59,6 +59,9 @@ tr.sum td{font-weight:700;background:var(--bg);border-top:2px solid var(--bd);fo
 .mv button{padding:2px 7px;font-size:12px;line-height:1.3;border-radius:5px}
 .note{font-size:12px;color:var(--muted);margin:6px 0}
 .ok{color:var(--s3);font-weight:600}.warn{color:var(--s2);font-weight:600}.crit{color:var(--crit);font-weight:700}
+.stoconai{color:var(--s3)}
+button.stoconai,.btn-label.stoconai{background:var(--card);color:var(--s3);border-color:var(--s3)}
+#m_i[aria-pressed=true]{background:var(--s3);color:#fff;border-color:var(--s3)}
 .row-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 16px;margin-top:6px}
 .row{display:flex;flex-wrap:wrap;gap:4px 8px;padding:5px 0;border-bottom:1px solid var(--grid)}
 .row .k{color:var(--muted);flex:0 0 88px;font-size:12px}

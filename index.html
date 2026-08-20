@@ -47,12 +47,12 @@
 <h2><span class=n>2</span>商品別入力</h2>
 <div class=modes>
 <button id=m_o aria-pressed=true onclick="setMode('o')">発注</button>
-<button id=m_i aria-pressed=false onclick="setMode('i')">AI推奨</button>
+<button id=m_i class=stoconai aria-pressed=false onclick="setMode('i')">ストコンAI</button>
 <button id=m_a aria-pressed=false onclick="setMode('a')">実績</button>
 </div>
 <div class=btns>
 <button class="gh sm" id=sortb onclick="toggleSort()">並べ替え：OFF</button>
-<button class="gh sm" onclick="fillFrom('i')">AI推奨をコピー</button>
+<button class="gh sm stoconai" onclick="fillFrom('i')">ストコンAIをコピー</button>
 <button class="gh sm" onclick="clearMode()">この列を消す</button>
 <button class="gh sm" onclick="editItem(null)">＋商品</button>
 </div>
@@ -62,7 +62,7 @@
 <div class=card>
 <h2><span class=n>3</span>履歴</h2>
 <div class=btns><button class="gh sm" onclick="openHist()">＋今日の実績を記録</button></div>
-<div style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th>AI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
+<div style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
 </div>
 
 <div class=card>
@@ -116,7 +116,7 @@
 <div><label>日付</label><input id=h_d placeholder="8/21"></div>
 <div><label>天候</label><input id=h_w placeholder="曇のち雨"></div></div>
 <div class="fg g4">
-<div><label>AI推奨</label><input id=h_ai type=number></div>
+<div><label class=stoconai>ストコンAI</label><input id=h_ai type=number></div>
 <div><label>納品</label><input id=h_n type=number></div>
 <div><label>販売</label><input id=h_s type=number></div>
 <div><label>廃棄</label><input id=h_ha type=number></div></div>
