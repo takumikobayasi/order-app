@@ -1,6 +1,7 @@
 <!doctype html><html lang=ja><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>発注アプリ v3.4 (Cloud Sync)</title>
+<title>発注アプリ v3.5 (OCR & Cloud Sync)</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{color-scheme:light;--bg:#f9f9f7;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8b8a84;
 --bd:rgba(11,11,11,.12);--grid:#e6e5df;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#c9a227;--crit:#d64545}
@@ -34,10 +35,10 @@ border-radius:9px;background:var(--bg);color:var(--ink)}
 input[type=number]{text-align:right}
 .fg{display:grid;gap:10px;margin-bottom:10px}
 .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
-button{font:inherit;font-size:13.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--s1);
-background:var(--s1);color:#fff;font-weight:600;cursor:pointer}
-button.gh{background:var(--card);color:var(--ink2);border-color:var(--bd);font-weight:500}
-button.sm{padding:6px 11px;font-size:12.5px}
+button,.btn-label{font:inherit;font-size:13.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--s1);
+background:var(--s1);color:#fff;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+button.gh,.btn-label.gh{background:var(--card);color:var(--ink2);border-color:var(--bd);font-weight:500}
+button.sm,.btn-label.sm{padding:6px 11px;font-size:12.5px}
 button.cloud{background:#0f9d58;border-color:#0f9d58;color:#fff}
 button[aria-pressed=true]{background:var(--s1);color:#fff;border-color:var(--s1)}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
@@ -154,7 +155,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </div>
 
 <div class=card>
-<h2><span class=n>4</span>書き出し・AI連携</h2>
+<h2><span class=n>4</span>書き出し・AI連携・カメラ取込</h2>
 <div class=btns>
 <button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
 <button class="gh sm" onclick="outCompact()">AIに送る（短い）</button>
@@ -162,8 +163,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <button class="gh sm" onclick="copyOut()">コピー</button>
 <button class="gh sm" onclick="saveFile()">ファイル保存</button>
 <button class="gh sm" onclick="dlg('dImp')">読み込み</button>
+<label class="btn-label gh sm">
+📷 写真読取<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+</label>
 </div>
 <textarea id=out readonly></textarea>
+<p class=note>「📷 写真読取」で帳票や画面を撮影すると自動で文字解析されます。その文字をAIチャットに貼るとデータ化できます。</p>
 </div>
 
 </div>
@@ -280,7 +285,7 @@ function dlg(id){if(id==='dSet')renderSet();$(id).showModal()}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 
-/* ---------- クラウド同期 (Google Apps Script) ---------- */
+/* ---------- クラウド同期 ---------- */
 function getGasUrl(){return localStorage.getItem(GAS_KEY)||DEFAULT_GAS_URL}
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
 async function cloudSave(){
@@ -302,6 +307,24 @@ async function cloudLoad(){
     if(data&&data.g){DB=data;save();renderAll();flash('☁️ クラウド読込完了')}
     else{alert('Googleドライブに保存データがありませんでした')}
   }catch(e){alert('クラウド読込に失敗しました');flash('読込失敗')}
+}
+
+/* ---------- 写真OCR読み取り処理 ---------- */
+async function handleImage(input){
+  if(!input.files||!input.files[0])return;
+  const file=input.files[0];
+  $('st').textContent='写真解析中...';
+  try{
+    flash('文字を解析しています...');
+    const res=await Tesseract.recognize(file,'jpn+eng');
+    const txt=res.data.text;
+    $('out').value="【写真から読み取ったテキスト】\n"+txt;
+    alert('写真をテキスト化しました。下の書き出し枠の内容をコピーしてAIチャットに送ると、発注データに一括変換できます。');
+    flash('写真解析完了');
+  }catch(e){
+    alert('写真の読み取りに失敗しました。チャットに直接画像を貼ってください。');
+    flash('解析失敗');
+  }
 }
 
 /* ---------- 曜日・マニュアル公式学習 ---------- */
