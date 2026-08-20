@@ -534,6 +534,15 @@ function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)}
   $('dHist').close();renderHist();renderSetup();autosave();flash('記録しました')}
 function saveBase(){G().base=Number($('s_base').value)||0;G().up=Number($('s_up').value)||1;
   renderSetup();autosave();flash('保存しました')}
+/* 特殊カレンダー(GW/お盆/年末年始)と当日(集計未確定)を除いた実績平均を提案する */
+function suggestBase(){
+  const g=G();
+  const todayStr=(()=>{const t=new Date();return (t.getMonth()+1)+'/'+t.getDate()})();
+  const vals=g.hist.filter(h=>h.s!=null&&h.d!==todayStr&&!specialPeriod(h.d)).map(h=>h.s);
+  if(!vals.length)return null;
+  return{avg:Math.round(vals.reduce((a,b)=>a+b,0)/vals.length),n:vals.length}}
+function applySuggestBase(){const s=suggestBase();if(!s){alert('実績データが足りません');return}
+  $('s_base').value=s.avg;flash('提案値を反映しました（保存ボタンを押してください）')}
 function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
   const m=d.match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m){alert('8/22 のように入れてください');return}
   G().tgt[+m[1]+'/'+ +m[2]]={q:Number($('tg_q').value)||0,a:Number($('tg_a').value)||0};
@@ -541,6 +550,8 @@ function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
 function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   const loc=getLoc();$('loc_status').textContent=loc?'設定済み: '+loc.name:'未設定';
+  const sug=suggestBase();
+  $('s_base_sug').textContent=sug?`実績平均(特殊カレンダー・当日除く、${sug.n}日分): ${sug.avg}個`:'実績データがまだ足りません';
   const L=learnDow();
   ['月','火','水','木','金','土','日'].forEach(d=>{
     const w=document.createElement('div');w.className='row';
