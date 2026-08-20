@@ -46,6 +46,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--grid);text-align:right;font-var
 td.l{text-align:left;font-variant-numeric:normal}
 #itb input{width:52px;padding:7px 4px;text-align:center;font-size:16px;border-radius:7px;transition:border-color .2s,background .2s}
 #itb input.bad-unit{border-color:var(--crit);background:rgba(214,69,69,.12);color:var(--crit);font-weight:700}
+#itb input.locked{background:var(--grid);color:var(--muted);cursor:not-allowed}
 .nm1{font-size:13.5px;font-weight:600;line-height:1.3}
 .nm2{font-size:11px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;
 -webkit-box-orient:vertical;overflow:hidden}

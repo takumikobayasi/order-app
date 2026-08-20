@@ -6,7 +6,7 @@ const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK4
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
-let DB=null, MODE='o', SORT=false, EDIT=null;
+let DB=null, MODE='o', SORT=false, EDIT=null, LOCK_OVERRIDE=false;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',carry:null,v:{}}}}
@@ -118,6 +118,20 @@ function dowOf(t){t=(t||'').trim();let m=t.match(/[（(]?([月火水木金土日
     if(curM>=11&&inM<=2)y++;
     return '日月火水木金土'[new Date(y,inM-1,+m[2]).getDay()]}
   return null}
+/* AI推奨は学習データからGW/お盆/年末年始を除外しているため、この期間は意思入れが必須（マニュアル準拠） */
+function specialPeriod(t){
+  const m=(t||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
+  if(!m)return null;
+  const mo=+m[1],d=+m[2];
+  if((mo===4&&d>=29)||(mo===5&&d<=5))return 'GW';
+  if(mo===8&&d>=13&&d<=16)return 'お盆';
+  if((mo===12&&d>=29)||(mo===1&&d<=3))return '年末年始';
+  return null}
+/* 締切ロック：1便は発注日10:00、2便/3便は15:00でストコンへ送信済みとなり編集不可（マニュアル準拠） */
+function lockState(){
+  if(LOCK_OVERRIDE)return{c0:false,c12:false};
+  const t=new Date().getHours()*60+new Date().getMinutes();
+  return{c0:t>=600,c12:t>=900}}
 function learnDow(){const g=G(),by={},all=[];
   g.hist.forEach(h=>{const d=dowOf(h.d);if(!d||h.s==null)return;(by[d]=by[d]||[]).push(h.s);all.push(h.s)});
   if(all.length<7)return null;
@@ -191,10 +205,14 @@ function renderSetup(){
     fcSt = Math.abs(d)<=10?'ok':'warn';
   }
   if(t){if(!$('tq').value)$('tq').value=t.q;if(!$('ta').value)$('ta').value=t.a}
+  const sp=specialPeriod($('dt').value);
+  const LK=lockState();
+  const lockTxt=LK.c12?'🔒 1便・2便・3便とも締切済（15:00）':LK.c0?'🔒 1便のみ締切済（10:00）／2便・3便は15:00まで編集可':'🔓 全便編集可（1便は10:00、2便・3便は15:00締切）';
   const rows=[
     ['納品日',$('dt').value.trim()||'未入力',$('dt').value.trim()?'':'warn'],
     ['曜日係数',i?`${i.d}曜 ${i.f.toFixed(2)}（${i.src}）`:'納品日を入れてください',i?'':'warn'],
     ['便構成比',i?`${i.type} ${i.r[0]}/${i.r[1]}/${i.r[2]}%`:'—',i?'ok':'warn'],
+    ['締切状況',lockTxt+(LOCK_OVERRIDE?'（手動解除中）':''),LK.c0?'warn':'ok'],
     ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
     ['今朝の棚',carry?carry+'個':'数えたら入力',carry?'ok':'warn'],
@@ -202,6 +220,7 @@ function renderSetup(){
     ['過不足予測',fc,fcSt],
     ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
+  if(sp)rows.splice(2,0,['特殊カレンダー',`${sp}期間：ストコンAIの学習対象外のため意思入れ必須`,'crit']);
   const B=$('setup');B.textContent='';
   rows.forEach(([a,c,st])=>{const w=document.createElement('div');w.className='row';
     const x=document.createElement('div');x.className='k';x.textContent=a;
@@ -258,12 +277,15 @@ function renderItems(){
       sp.textContent=r.grade||'—';t2.appendChild(sp)}
     tr.appendChild(t2);
     const v=vv(r.id,MODE);
+    const LK=MODE==='o'?lockState():{c0:false,c12:false};
     for(let i=0;i<3;i++){const td=document.createElement('td');
       const inp=document.createElement('input');inp.type='number';inp.inputMode='numeric';
       inp.dataset.row=ix;inp.dataset.col=i;
       inp.value=v[i]===null?'':v[i];
       if((r.unit||1)>1&&v[i]!=null&&v[i]%r.unit!==0){
         inp.classList.add('bad-unit');inp.title=`${r.unit}個単位です`}
+      const locked=(i===0&&LK.c0)||(i>0&&LK.c12);
+      if(locked){inp.disabled=true;inp.classList.add('locked');inp.title='締切済のため編集できません'}
       inp.onfocus=e=>e.target.select();
       inp.onkeydown=e=>{
         const rIx=+e.target.dataset.row, cIx=+e.target.dataset.col;
@@ -302,6 +324,9 @@ function mv(i,d){const a=G().items;const j=i+d;if(j<0||j>=a.length)return;
 function toggleSort(){SORT=!SORT;$('sortb').textContent='並べ替え：'+(SORT?'ON':'OFF');
   $('sortb').setAttribute('aria-pressed',String(SORT));renderItems()}
 function setMode(m){MODE=m;['o','i','a'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
+function toggleLockOverride(){LOCK_OVERRIDE=!LOCK_OVERRIDE;
+  $('lockb').textContent=LOCK_OVERRIDE?'🔓 締切ロック解除中':'🔒 締切ロック解除';
+  $('lockb').setAttribute('aria-pressed',String(LOCK_OVERRIDE));paintTotals()}
 function fillFrom(src){G().items.forEach(r=>{const v=vv(r.id,src);
   if(v.some(x=>x!==null))v.forEach((x,i)=>setV(r.id,MODE,i,x))});paintTotals();autosave();flash('コピーしました')}
 function clearMode(){G().items.forEach(r=>{const c=G().cur.v[r.id];if(c)c[MODE]=[null,null,null]});
@@ -403,7 +428,8 @@ function alloc(){
     +(carry?`　※今朝の棚${carry}個を引いた数です`:'')
     +(tq?`　個数目標の${Math.round(s.T/tq*100)}%`:'')+(ta?`　金額目標の${Math.round(s.amt/ta*100)}%`:'')}
 function setAll(id,v){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
-  c[id].o=v.slice()}
+  const LK=lockState(),old=c[id].o;
+  c[id].o=v.map((x,i)=>((i===0&&LK.c0)||(i>0&&LK.c12))?old[i]:x)}
 
 /* ---------- 商品編集 ---------- */
 function editItem(ix){EDIT=ix;const r=ix==null?{}:G().items[ix];
@@ -478,16 +504,17 @@ function wipe(){if(!confirm('この端末のデータを全部消します。よ
 function outPrompt(){
   const g=G(),s=sums('o'),ai=sums('i'),carry=Number($('carry').value)||0;
   const dv=($('dt').value||'').trim(), i=dowInfo(), k=tgtKey(), t=k?g.tgt[k]:null;
-  const D=demand(), aiAdp=getAiAdoption();
+  const D=demand(), aiAdp=getAiAdoption(), sp=specialPeriod(dv);
   const ch=[];g.items.forEach(r=>{
     const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
     if(Math.abs(a-b)>=2&&(a||b))ch.push(`${r.name}: ストコンAI推奨${b}個 → 自店発注${a}個 (日販${r.day||0})`)});
   const h=g.hist.slice(-4).map(x=>`- ${x.d}(${x.w||'天気不明'}): 納品${x.n??'-'} / 販売${x.s??'-'} / 廃棄${x.ha??'-'} (消化率:${x.n&&x.s?(x.s/x.n*100).toFixed(0)+'%':'-'})${x.m?' ['+x.m+']':''}`);
-  
+
   const p=[
     `【発注アドバイス依頼】`,
     `対象カテゴリ: ${g.name}`,
     `対象日: ${dv}${i?' ('+i.d+'曜・係数'+i.f.toFixed(2)+')':''}`,
+    ...(sp?[`⚠ 特殊カレンダー: ${sp}期間（ストコンAIの学習対象外のため参考程度に）`]:[]),
     `ストコンAI採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
     `本部目標: ${t?t.q+'個 / '+(t.a||0).toLocaleString()+'円':'未設定'}`,
     `需要見込み: ${D?D.q+'個 ('+D.src+')':'未設定'}`,
