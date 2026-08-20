@@ -318,16 +318,14 @@ function renderItems(){
       n1.appendChild(sp)}
     const nameSp=document.createElement('span');nameSp.className='nm1-name';nameSp.textContent=r.name;
     n1.appendChild(nameSp);
-    const n2=document.createElement('div');n2.className='nm2';
-    n2.textContent='¥'+(r.price||0)+' 日販'+(r.day||0)+((r.unit||1)>1?' 2個単位':'')+(r.memo?' / '+r.memo:'');
-    t1.append(n1,n2);
     const wf=wasteFactor(r);
-    const subNotes=[];
-    if(r.my)subNotes.push('本部目安 '+r.my+'個');
-    if(wf<1)subNotes.push(`廃棄実績あり：配分${Math.round((1-wf)*100)}%減`);
-    if(subNotes.length){const my=document.createElement('div');my.className='my';
-      if(wf<1)my.style.color='var(--crit)';
-      my.textContent=subNotes.join(' ・ ');t1.appendChild(my)}
+    const infoParts=['¥'+(r.price||0)+' 日販'+(r.day||0)+((r.unit||1)>1?' 2個単位':'')];
+    if(r.memo)infoParts.push(r.memo);
+    if(r.my)infoParts.push('本部目安'+r.my+'個');
+    if(wf<1)infoParts.push(`廃棄実績${Math.round((1-wf)*100)}%減`);
+    const n2=document.createElement('div');n2.className='nm2'+(wf<1?' nm2-warn':'');
+    n2.textContent=infoParts.join(' ・ ');
+    t1.append(n1,n2);
     t1.onclick=()=>{if(SORT)editItem(ix)};
     tr.appendChild(t1);
     const t2=document.createElement('td');
