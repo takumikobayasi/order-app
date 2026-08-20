@@ -227,6 +227,9 @@ function renderItems(){
     n2.textContent='¥'+(r.price||0)+' 日販'+(r.day||0)+((r.unit||1)>1?' 2個単位':'')+(r.memo?' / '+r.memo:'');
     t1.append(n1,n2);
     if(r.my){const my=document.createElement('div');my.className='my';my.textContent='本部目安 '+r.my+'個';t1.appendChild(my)}
+    const wf=wasteFactor(r);
+    if(wf<1){const wn=document.createElement('div');wn.className='my';wn.style.color='var(--crit)';
+      wn.textContent=`廃棄実績あり：配分 ${Math.round((1-wf)*100)}%減`;t1.appendChild(wn)}
     t1.onclick=()=>{if(SORT)editItem(ix)};
     tr.appendChild(t1);
     const t2=document.createElement('td');
@@ -300,6 +303,20 @@ function renderAll(){renderTabs();
   const g=G();$('dt').value=g.cur.dt||'';$('carry').value=g.cur.carry??'';
   applyDow();renderItems();renderHist();renderSetup()}
 
+/* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
+function wasteFactor(r){
+  if(!r.pos||r.margin==null)return 1;
+  const sales=(r.pos.sales||[]).reduce((a,x)=>a+(x||0),0);
+  const waste=(r.pos.waste||[]).reduce((a,x)=>a+(x||0),0);
+  if(waste<=0||sales+waste<=0)return 1;
+  const wasteRatio=waste/(sales+waste);
+  const costRatio=1-r.margin/100, profitRatio=r.margin/100;
+  if(profitRatio<=0)return 1;
+  const reduce=Math.min(0.3,wasteRatio*(costRatio/profitRatio));
+  return 1-reduce;
+}
+function edayOf(r){return (r.day||0)*wasteFactor(r)}
+
 /* ---------- 公式マニュアル準拠：売筋上位50%傾斜配分 ---------- */
 function fix2(v,unit){if((unit||1)<2)return v.slice();v=v.slice();const T=v.reduce((a,b)=>a+b,0);
   if(!v.includes(1))return v;if(T<=1)return[0,0,0];
@@ -316,25 +333,25 @@ function alloc(){
   let tq=Number($('tq').value)||0;const ta=Number($('ta').value)||0;
   const live=g.items.filter(r=>(r.day||0)>0);
   if(!live.length){alert('日販が入っている商品がありません');return}
-  const W=live.reduce((a,r)=>a+r.day,0);
+  const W=live.reduce((a,r)=>a+edayOf(r),0);
   if(!tq&&!ta){alert('目標個数か金額を入れてください');return}
-  let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/W));
+  let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/live.reduce((a,r)=>a+r.day,0)));
   if(carry>0)target=Math.max(1,target-carry);
 
-  const sorted=[...live].sort((a,b)=>(b.day||0)-(a.day||0));
+  const sorted=[...live].sort((a,b)=>edayOf(b)-edayOf(a));
   const topCount=Math.max(1,Math.ceil(sorted.length*0.5));
   const topIds=new Set(sorted.slice(0,topCount).map(r=>r.id));
 
   const base={},q={};
-  const W_top=sorted.slice(0,topCount).reduce((a,r)=>a+r.day,0);
-  const minBotTotal=sorted.slice(topCount).reduce((a,r)=>a+Math.round(r.day),0);
+  const W_top=sorted.slice(0,topCount).reduce((a,r)=>a+edayOf(r),0);
+  const minBotTotal=sorted.slice(topCount).reduce((a,r)=>a+Math.round(edayOf(r)),0);
   const allocTop=Math.max(0,target-minBotTotal);
 
   live.forEach(r=>{
     if(topIds.has(r.id)){
-      base[r.id]=W_top>0?(r.day/W_top*allocTop):r.day;
+      base[r.id]=W_top>0?(edayOf(r)/W_top*allocTop):edayOf(r);
     }else{
-      base[r.id]=Math.max(1,Math.round(r.day));
+      base[r.id]=Math.max(1,Math.round(edayOf(r)));
     }
     q[r.id]=Math.max(r.my||1,Math.round(base[r.id]));
   });
@@ -376,11 +393,13 @@ function editItem(ix){EDIT=ix;const r=ix==null?{}:G().items[ix];
   $('f_name').value=r.name||'';$('f_price').value=r.price??'';$('f_day').value=r.day??'';
   $('f_unit').value=String(r.unit||1);$('f_grade').value=r.grade||'○';
   $('f_my').value=r.my??'';$('f_tag').value=r.tag||'';$('f_memo').value=r.memo||'';
+  $('f_margin').value=r.margin??'';
   $('dItem').showModal()}
 function saveItem(){const n=$('f_name').value.trim();if(!n){alert('商品名を入れてください');return}
   const o={name:n,price:Number($('f_price').value)||0,day:Number($('f_day').value)||0,
     unit:Number($('f_unit').value)||1,grade:$('f_grade').value,my:Number($('f_my').value)||0,
-    tag:$('f_tag').value.trim(),memo:$('f_memo').value.trim()};
+    tag:$('f_tag').value.trim(),memo:$('f_memo').value.trim(),
+    margin:$('f_margin').value===''?undefined:Number($('f_margin').value)};
   if(EDIT==null){o.id='i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);G().items.push(o)}
   else G().items[EDIT]=Object.assign(G().items[EDIT],o);
   $('dItem').close();renderTabs();paintTotals();autosave();flash('保存しました')}
