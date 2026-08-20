@@ -49,6 +49,11 @@ function wmoLabel(c){
 async function fetchWeather(){
   const loc=getLoc();
   if(!loc){alert('先に「設定」から地域を登録してください');dlg('dSet');return}
+  if(!$('dt').value.trim()){
+    const tmr=new Date(Date.now()+86400000);
+    $('dt').value=(tmr.getMonth()+1)+'/'+tmr.getDate();
+    G().cur.dt=$('dt').value;applyDow();$('tq').value='';$('ta').value='';
+  }
   const m=($('dt').value||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
   if(!m){alert('納品日を「8/21」のように入力してください');return}
   const now=new Date();let y=now.getFullYear(),mo=+m[1],da=+m[2];
