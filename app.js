@@ -195,15 +195,6 @@ function renderSetup(){
   const g=G(),i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null,s=sums('o'),carry=Number($('carry').value)||0;
   const D=demand(); const dem=D?D.q:null, demSrc=D?D.src:'';
   const aiAdp=getAiAdoption();
-  let fc='—',fcSt='';
-  if(carry&&dem){
-    const have=carry+s.b[1];
-    const need=dem-Math.round(dem*0.07);
-    const d=have-need;
-    fc = d>0 ? `${d}個 余る見込み（棚${carry}＋2便${s.b[1]}＝${have} / 必要${need}）`
-             : `${-d}個 足りない（棚${carry}＋2便${s.b[1]}＝${have} / 必要${need}）`;
-    fcSt = Math.abs(d)<=10?'ok':'warn';
-  }
   if(t){if(!$('tq').value)$('tq').value=t.q;if(!$('ta').value)$('ta').value=t.a}
   const sp=specialPeriod($('dt').value);
   const LK=lockState();
@@ -215,9 +206,8 @@ function renderSetup(){
     ['締切状況',lockTxt+(LOCK_OVERRIDE?'（手動解除中）':''),LK.c0?'warn':'ok'],
     ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
-    ['今朝の棚',carry?carry+'個':'数えたら入力',carry?'ok':'warn'],
+    ['今朝の棚',carry?carry+'個（配分の目標数から差し引きます）':'数えたら入力',carry?'ok':'warn'],
     ['今日の需要見込み',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
-    ['過不足予測',fc,fcSt],
     ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
   if(sp)rows.splice(2,0,['特殊カレンダー',`${sp}期間：ストコンAIの学習対象外のため意思入れ必須`,'crit']);
@@ -458,20 +448,23 @@ function openHist(){const d=($('dt').value||'').trim();
   const set=(id,v)=>$(id).value=(v===null||v===undefined)?'':v;
   set('h_d',d);set('h_w',r.w);set('h_ai',r.ai);set('h_n',r.n);set('h_s',r.s);set('h_ha',r.ha);
   set('h_kk',r.kk);set('h_k',r.k);set('h_m',r.m);set('h_am',r.am);
-  const nb=r.nb||[null,null,null],sb=r.sb||[null,null,null];
+  const nb=r.nb||[null,null,null],sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
   set('h_n1',nb[0]);set('h_n2',nb[1]);set('h_n3',nb[2]);
   set('h_s1',sb[0]);set('h_s2',sb[1]);set('h_s3',sb[2]);
+  set('h_ha1',hab[0]);set('h_ha2',hab[1]);set('h_ha3',hab[2]);
   $('dHist').showModal()}
 function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)};
   const d=$('h_d').value.trim()||$('dt').value.trim();if(!d){alert('日付を入れてください');return}
-  const nb=[n('h_n1'),n('h_n2'),n('h_n3')],sb=[n('h_s1'),n('h_s2'),n('h_s3')];
+  const nb=[n('h_n1'),n('h_n2'),n('h_n3')],sb=[n('h_s1'),n('h_s2'),n('h_s3')],hab=[n('h_ha1'),n('h_ha2'),n('h_ha3')];
   const i=G().hist.findIndex(h=>h.d===d);
   const old=i>=0?G().hist[i]:{};
   const pick=(v,o)=>v===null||v===''||v===undefined?(o??null):v;
   const rec={d,w:pick($('h_w').value.trim(),old.w),ai:pick(n('h_ai'),old.ai),n:pick(n('h_n'),old.n),
     s:pick(n('h_s'),old.s),ha:pick(n('h_ha'),old.ha),kk:pick(n('h_kk'),old.kk),k:pick(n('h_k'),old.k),
     m:pick($('h_m').value.trim(),old.m),am:pick(n('h_am'),old.am),
-    nb:nb.some(x=>x!==null)?nb:(old.nb||null),sb:sb.some(x=>x!==null)?sb:(old.sb||null)};
+    nb:nb.some(x=>x!==null)?nb:(old.nb||null),sb:sb.some(x=>x!==null)?sb:(old.sb||null),
+    hab:hab.some(x=>x!==null)?hab:(old.hab||null)};
+  if(rec.ha==null&&rec.hab)rec.ha=rec.hab.reduce((a,x)=>a+(x||0),0);
   if(rec.s==null&&rec.am!=null){
     const prev=G().hist.filter(x=>x.d!==d&&x.am!=null).slice(-1)[0];
     if(prev&&rec.n!=null)rec.s=Math.max(0,prev.am+rec.n-rec.am-(rec.ha||0));}
