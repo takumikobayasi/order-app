@@ -9,7 +9,7 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0
 let DB=null, MODE='o', SORT=false, EDIT=null, LOCK_OVERRIDE=false;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
-  base:0,up:1,cur:{dt:'',carry:null,v:{}}}}
+  base:0,up:1,cur:{dt:'',v:{}}}}
 function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',g}}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
@@ -243,7 +243,7 @@ function renderTabs(){const el=$('tabs');el.textContent='';
   $('title').textContent=G().icon+' '+G().name+' 発注'}
 
 function renderSetup(){
-  const g=G(),i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null,s=sums('o'),carry=Number($('carry').value)||0;
+  const g=G(),i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null,s=sums('o');
   const D=demand(); const dem=D?D.q:null, demSrc=D?D.src:'';
   const aiAdp=getAiAdoption();
   if(t){if(!$('tq').value)$('tq').value=t.q;if(!$('ta').value)$('ta').value=t.a}
@@ -257,7 +257,6 @@ function renderSetup(){
     ['締切状況',lockTxt+(LOCK_OVERRIDE?'（手動解除中）':''),LK.c0?'warn':'ok'],
     ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
-    ['今朝の棚',carry?carry+'個（配分の目標数から差し引きます）':'数えたら入力',carry?'ok':'warn'],
     ['今日の需要見込み（提案数）',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
     ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
@@ -390,7 +389,7 @@ function renderHist(){const B=$('htb');B.textContent='';
     B.appendChild(tr)})}
 
 function renderAll(){renderTabs();
-  const g=G();$('dt').value=g.cur.dt||'';$('carry').value=g.cur.carry??'';
+  const g=G();$('dt').value=g.cur.dt||'';
   $('wthr').value=g.cur.wthr||'';
   const ai=g.cur.ai||[null,null,null];
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
@@ -422,14 +421,12 @@ function fix2(v,unit){if((unit||1)<2)return v.slice();v=v.slice();const T=v.redu
 function alloc(){
   const g=G();if(!g.items.length){alert('先に商品を登録してください');return}
   applyDow();
-  const carry=Number($('carry').value)||0;
   let tq=Number($('tq').value)||0;const ta=Number($('ta').value)||0;
   const live=g.items.filter(r=>(r.day||0)>0);
   if(!live.length){alert('日販が入っている商品がありません');return}
   const W=live.reduce((a,r)=>a+edayOf(r),0);
   if(!tq&&!ta){alert('目標個数か金額を入れてください');return}
   let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/live.reduce((a,r)=>a+r.day,0)));
-  if(carry>0)target=Math.max(1,target-carry);
 
   const sorted=[...live].sort((a,b)=>edayOf(b)-edayOf(a));
   const topCount=Math.max(1,Math.ceil(sorted.length*0.5));
@@ -475,7 +472,6 @@ function alloc(){
   const s=sums('o');
   $('allocnote').className='note ok';
   $('allocnote').textContent=`${s.T}個 / ${s.amt.toLocaleString()}円　便別${R.join('/')}%`
-    +(carry?`　※今朝の棚${carry}個を引いた数です`:'')
     +(tq?`　個数目標の${Math.round(s.T/tq*100)}%`:'')+(ta?`　金額目標の${Math.round(s.amt/ta*100)}%`:'')}
 function setAll(id,v){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
   const LK=lockState(),old=c[id].o;
@@ -556,7 +552,7 @@ function wipe(){if(!confirm('この端末のデータを全部消します。よ
 
 /* ---------- 入出力 ---------- */
 function outPrompt(){
-  const g=G(),s=sums('o'),ai=sums('i'),carry=Number($('carry').value)||0;
+  const g=G(),s=sums('o'),ai=sums('i');
   const dv=($('dt').value||'').trim(), i=dowInfo(), k=tgtKey(), t=k?g.tgt[k]:null;
   const D=demand(), aiAdp=getAiAdoption(), sp=specialPeriod(dv);
   const ch=[];g.items.forEach(r=>{
@@ -575,7 +571,6 @@ function outPrompt(){
     ...((()=>{const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
       return aiT?[`ストコンAI推奨合計(推奨値反映): ${aiT}個（1便${$('ai1').value||0}/2便${$('ai2').value||0}/3便${$('ai3').value||0}）`]:[]})()),
     `発注合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
-    `今朝の棚 総数: ${carry}個`,
     `\n## 直近の実績推移`,
     h.length?h.join('\n'):'実績データなし',
     `\n## ストコンAI推奨からの主な変更商品（±2個以上）`,
@@ -586,13 +581,12 @@ function outPrompt(){
   $('out').value=p.join('\n');
 }
 function outCompact(){const g=G(),s=sums('o'),ai=sums('i'),ac=sums('a');
-  const carry=Number($('carry').value)||0,i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null;
+  const i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null;
   const dv=($('dt').value||'').trim(), aiAdp=getAiAdoption();
   const L=[`#${g.name} ${dv}${(i&&!/[月火水木金土日]/.test(dv))?'('+i.d+')':''}`];
   if(t)L.push(`目標 ${t.q}個 ${t.a}円`);
   if(s.T)L.push(`発注 ${s.b.join('/')}=${s.T} ${s.amt}円`);
   if(ai.T)L.push(`ストコンAI ${ai.b.join('/')}=${ai.T}${aiAdp?' (採用率'+aiAdp.rate+'%)':''}`);
-  if(carry)L.push(`今朝の棚 ${carry}`);
   if(ac.T)L.push(`実績 納品/販売/廃棄 ${ac.b.join('/')}`);
   const ch=[];g.items.forEach(r=>{const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),
     b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
@@ -613,9 +607,8 @@ function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
     renderAll();flash('読み込みました')}catch(e){alert('読み込めませんでした')}}
 
 /* ---------- 起動 ---------- */
-['dt','carry','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
-  G().cur.dt=$('dt').value;G().cur.carry=$('carry').value===''?null:Number($('carry').value);
-  G().cur.wthr=$('wthr').value;
+['dt','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
+  G().cur.dt=$('dt').value;G().cur.wthr=$('wthr').value;
   if(id==='dt'){applyDow();$('tq').value='';$('ta').value=''}
   renderSetup();autosave()}));
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
