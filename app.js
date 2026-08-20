@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url';
+const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
 
 
@@ -22,6 +22,50 @@ const G=()=>DB.g[DB.active];
 function dlg(id){if(id==='dSet')renderSet();$(id).showModal()}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
+
+/* ---------- 天気の自動取得（Open-Meteo：APIキー不要） ---------- */
+function getLoc(){try{return JSON.parse(localStorage.getItem(LOC_KEY)||'null')}catch(e){return null}}
+function setLoc(v){localStorage.setItem(LOC_KEY,JSON.stringify(v))}
+async function searchLoc(){
+  const name=$('loc_name').value.trim();
+  if(!name){alert('地域名を入れてください');return}
+  $('loc_status').textContent='検索中...';
+  try{
+    const res=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=ja&format=json`);
+    const data=await res.json();
+    const r=data.results&&data.results[0];
+    if(!r){$('loc_status').textContent='見つかりませんでした';return}
+    setLoc({lat:r.latitude,lon:r.longitude,name:r.name+(r.admin1?'('+r.admin1+')':'')});
+    $('loc_status').textContent='設定済み: '+getLoc().name;
+    flash('地域を保存しました');
+  }catch(e){$('loc_status').textContent='検索に失敗しました（通信環境をご確認ください）'}
+}
+function wmoLabel(c){
+  if(c===0||c===1)return '晴';
+  if(c===2||c===3||c===45||c===48)return '曇';
+  if([71,73,75,77,85,86].includes(c))return '雪';
+  if([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(c))return '雨';
+  return '曇'}
+async function fetchWeather(){
+  const loc=getLoc();
+  if(!loc){alert('先に「設定」から地域を登録してください');dlg('dSet');return}
+  const m=($('dt').value||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
+  if(!m){alert('納品日を「8/21」のように入力してください');return}
+  const now=new Date();let y=now.getFullYear(),mo=+m[1],da=+m[2];
+  if(now.getMonth()+1>=11&&mo<=2)y++;
+  const dateStr=y+'-'+String(mo).padStart(2,'0')+'-'+String(da).padStart(2,'0');
+  flash('天気を取得中...');
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weathercode&timezone=Asia%2FTokyo&start_date=${dateStr}&end_date=${dateStr}`;
+    const res=await fetch(url);
+    const data=await res.json();
+    const code=data.daily&&data.daily.weathercode&&data.daily.weathercode[0];
+    if(code==null){alert('天気予報の取得範囲外でした（直近16日以内の日付のみ対応）');flash('取得失敗');return}
+    $('wthr').value=wmoLabel(code);
+    G().cur.wthr=$('wthr').value;renderSetup();autosave();
+    flash('天気を取得しました');
+  }catch(e){alert('天気の取得に失敗しました。通信環境をご確認ください');flash('取得失敗')}
+}
 
 /* ---------- クラウド同期 (CORS完全回避版) ---------- */
 function getGasUrl(){return localStorage.getItem(GAS_KEY)||DEFAULT_GAS_URL}
@@ -495,6 +539,7 @@ function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
   renderSet();renderSetup();autosave()}
 function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
+  const loc=getLoc();$('loc_status').textContent=loc?'設定済み: '+loc.name:'未設定';
   const L=learnDow();
   ['月','火','水','木','金','土','日'].forEach(d=>{
     const w=document.createElement('div');w.className='row';
