@@ -641,6 +641,18 @@ function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
   try{const d=JSON.parse(b64d(m[1]));if(!d.g)throw 0;DB=d;save();$('dImp').close();$('impbox').value='';
     renderAll();flash('読み込みました')}catch(e){alert('読み込めませんでした')}}
 
+/* ---------- マウスドラッグで横スクロール（DeX等タッチ非対応環境向け） ---------- */
+function enableDragScroll(el){
+  let down=false,startX=0,startLeft=0,moved=false;
+  el.addEventListener('mousedown',e=>{down=true;moved=false;startX=e.pageX;startLeft=el.scrollLeft;el.classList.add('dragging')});
+  window.addEventListener('mouseup',()=>{down=false;el.classList.remove('dragging')});
+  el.addEventListener('mouseleave',()=>{down=false;el.classList.remove('dragging')});
+  el.addEventListener('mousemove',e=>{if(!down)return;e.preventDefault();
+    const dx=e.pageX-startX;if(Math.abs(dx)>3)moved=true;el.scrollLeft=startLeft-dx});
+  el.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation()}},true);
+}
+document.querySelectorAll('.hscroll').forEach(enableDragScroll);
+
 /* ---------- 起動 ---------- */
 ['dt','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.dt=$('dt').value;G().cur.wthr=$('wthr').value;
