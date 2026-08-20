@@ -77,18 +77,36 @@ function cloudLoad(){
 async function handleImage(input){
   if(!input.files||!input.files[0])return;
   const file=input.files[0];
+  const st=$('ocrst');
+  if(typeof Tesseract==='undefined'){
+    st.className='note crit';
+    st.textContent='✕ 文字解析ライブラリを読み込めませんでした。通信環境をご確認のうえページを再読み込みしてください。';
+    input.value='';
+    return;
+  }
+  st.className='note warn';
+  st.textContent='解析中... 0%（写真の内容により10〜30秒ほどかかります）';
   $('st').textContent='解析中...';
   try{
-    flash('文字を解析しています...');
-    const res=await Tesseract.recognize(file,'jpn+eng');
+    const res=await Tesseract.recognize(file,'jpn+eng',{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          st.textContent=`解析中... ${Math.round((m.progress||0)*100)}%`;
+        }
+      }
+    });
     const txt=res.data.text;
     $('out').value="【写真から読み取ったテキスト】\n"+txt;
-    alert('写真をテキスト化しました。下の書き出し枠の内容をコピーしてAIチャットに送ると、発注データに一括変換できます。');
+    $('out').scrollIntoView({behavior:'smooth',block:'center'});
+    st.className='note ok';
+    st.textContent='✓ 解析完了。下の書き出し枠にテキストを入れました。コピーしてAIチャットに貼ってください。';
     flash('写真解析完了');
   }catch(e){
-    alert('写真の読み取りに失敗しました。チャットに直接画像を貼ってください。');
+    st.className='note crit';
+    st.textContent='✕ 写真の読み取りに失敗しました：'+(e&&e.message?e.message:'不明なエラー');
     flash('解析失敗');
   }
+  input.value='';
 }
 
 /* ---------- 曜日・マニュアル公式学習 ---------- */
