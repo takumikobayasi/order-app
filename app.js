@@ -644,13 +644,16 @@ function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
 /* ---------- マウスドラッグで横スクロール（DeX等タッチ非対応環境向け） ---------- */
 function enableDragScroll(el){
   let down=false,startX=0,startLeft=0,moved=false,pid=null;
+  el.addEventListener('dragstart',e=>e.preventDefault());
   el.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch')return;
     down=true;moved=false;startX=e.clientX;startLeft=el.scrollLeft;pid=e.pointerId;
     try{el.setPointerCapture(pid)}catch(err){}
-    el.classList.add('dragging')});
+    el.classList.add('dragging');
+    e.preventDefault()});
   el.addEventListener('pointermove',e=>{if(!down||e.pointerType==='touch')return;
-    const dx=e.clientX-startX;if(Math.abs(dx)>3)moved=true;el.scrollLeft=startLeft-dx});
+    const dx=e.clientX-startX;if(Math.abs(dx)>3)moved=true;el.scrollLeft=startLeft-dx;
+    e.preventDefault()});
   const end=()=>{if(!down)return;down=false;el.classList.remove('dragging');
     if(pid!=null){try{el.releasePointerCapture(pid)}catch(err){}}};
   el.addEventListener('pointerup',end);
