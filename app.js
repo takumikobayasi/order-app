@@ -438,7 +438,12 @@ function alloc(){
   const live=g.items.filter(r=>(r.day||0)>0);
   if(!live.length){alert('日販が入っている商品がありません');return}
   const W=live.reduce((a,r)=>a+edayOf(r),0);
-  if(!tq&&!ta){alert('目標個数か金額を入れてください');return}
+  let usedDemand=false;
+  if(!tq&&!ta){
+    const D=demand();
+    if(!D){alert('目標個数か金額を入れてください（天気・曜日から提案するには設定で週平均販売数を登録してください）');return}
+    tq=D.q;usedDemand=true;
+  }
   let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/live.reduce((a,r)=>a+r.day,0)));
 
   const sorted=[...live].sort((a,b)=>edayOf(b)-edayOf(a));
@@ -485,7 +490,8 @@ function alloc(){
   const s=sums('o');
   $('allocnote').className='note ok';
   $('allocnote').textContent=`${s.T}個 / ${s.amt.toLocaleString()}円　便別${R.join('/')}%`
-    +(tq?`　個数目標の${Math.round(s.T/tq*100)}%`:'')+(ta?`　金額目標の${Math.round(s.amt/ta*100)}%`:'')}
+    +(usedDemand?`　※目標未入力のため天気・曜日からの提案数(${tq}個)を使用`:'')
+    +(tq&&!usedDemand?`　個数目標の${Math.round(s.T/tq*100)}%`:'')+(ta?`　金額目標の${Math.round(s.amt/ta*100)}%`:'')}
 function setAll(id,v){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
   const LK=lockState(),old=c[id].o;
   c[id].o=v.map((x,i)=>((i===0&&LK.c0)||(i>0&&LK.c12))?old[i]:x)}
