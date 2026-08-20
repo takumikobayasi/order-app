@@ -311,7 +311,7 @@ function renderItems(){
       const up=document.createElement('button');up.className='gh';up.textContent='▲';
       up.onclick=()=>mv(ix,-1);const dn=document.createElement('button');dn.className='gh';dn.textContent='▼';
       dn.onclick=()=>mv(ix,1);w.append(up,dn);t0.appendChild(w);tr.appendChild(t0)}
-    const t1=document.createElement('td');t1.className='l';
+    const t1=document.createElement('td');t1.className='l nmcell';
     const n1=document.createElement('div');n1.className='nm1';
     if(r.tag){
       const isNew=r.tag.includes('新');

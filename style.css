@@ -52,6 +52,7 @@ td.l{text-align:left;font-variant-numeric:normal}
 .nm2{font-size:11px;color:var(--muted);line-height:1.4;margin-top:1px;
 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nm2-warn{color:var(--crit);font-weight:600}
+.nmcell{max-width:min(34vw,240px)}
 .gr{display:inline-block;width:20px;height:20px;line-height:20px;border-radius:6px;color:#fff;
 font-size:11px;text-align:center;font-weight:700}
 .g4c{background:var(--s3)}.g3c{background:var(--s1)}.g2c{background:var(--s4)}.g1c{background:var(--s2)}.gnc{background:#8b5cf6}
