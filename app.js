@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
+const DEFAULT_LOC={lat:36.1214,lon:139.6015,name:'加須市(埼玉県)'};
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
 
 
@@ -24,7 +25,7 @@ function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 
 /* ---------- 天気の自動取得（Open-Meteo：APIキー不要） ---------- */
-function getLoc(){try{return JSON.parse(localStorage.getItem(LOC_KEY)||'null')}catch(e){return null}}
+function getLoc(){try{return JSON.parse(localStorage.getItem(LOC_KEY)||'null')||DEFAULT_LOC}catch(e){return DEFAULT_LOC}}
 function setLoc(v){localStorage.setItem(LOC_KEY,JSON.stringify(v))}
 async function searchLoc(){
   const name=$('loc_name').value.trim();
@@ -563,7 +564,7 @@ function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
   renderSet();renderSetup();autosave()}
 function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
-  const loc=getLoc();$('loc_status').textContent=loc?'設定済み: '+loc.name:'未設定';
+  $('loc_status').textContent='現在の地域: '+getLoc().name;
   const sug=suggestBase();
   $('s_base_sug').textContent=sug?`実績平均(特殊カレンダー・当日除く、${sug.n}日分): ${sug.avg}個`:'実績データがまだ足りません';
   const L=learnDow();
