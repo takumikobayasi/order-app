@@ -1,7 +1,6 @@
 <!doctype html><html lang=ja><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>発注アプリ v3.5 (OCR & Cloud Sync)</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<title>発注アプリ v3.6 (Cloud Sync)</title>
 <style>
 :root{color-scheme:light;--bg:#f9f9f7;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8b8a84;
 --bd:rgba(11,11,11,.12);--grid:#e6e5df;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#c9a227;--crit:#d64545}
@@ -15,8 +14,7 @@ padding:0 0 90px}
 header{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--bd)}
 .hbar{display:flex;align-items:center;gap:12px;padding:10px 14px;max-width:1100px;margin:0 auto}
 .hbar h1{font-size:17px;margin:0;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 10px;max-width:1100px;margin:0 auto;
-scrollbar-width:none}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 10px;max-width:1100px;margin:0 auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;
 border:1px solid var(--bd);border-radius:12px;background:var(--card);cursor:pointer;min-width:68px}
@@ -41,7 +39,7 @@ button.gh,.btn-label.gh{background:var(--card);color:var(--ink2);border-color:va
 button.sm,.btn-label.sm{padding:6px 11px;font-size:12.5px}
 button.cloud{background:#0f9d58;border-color:#0f9d58;color:#fff}
 button[aria-pressed=true]{background:var(--s1);color:#fff;border-color:var(--s1)}
-.btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.btns{display:flex;flex-wrap:gap;gap:8px;margin-bottom:10px}
 .modes{display:inline-flex;border:1px solid var(--bd);border-radius:9px;overflow:hidden;margin-bottom:10px}
 .modes button{border:0;border-radius:0;background:var(--card);color:var(--ink2);font-weight:500;padding:8px 13px}
 .modes button[aria-pressed=true]{background:var(--s1);color:#fff}
@@ -155,7 +153,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </div>
 
 <div class=card>
-<h2><span class=n>4</span>書き出し・AI連携・カメラ取込</h2>
+<h2><span class=n>4</span>書き出し・AI連携</h2>
 <div class=btns>
 <button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
 <button class="gh sm" onclick="outCompact()">AIに送る（短い）</button>
@@ -163,12 +161,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <button class="gh sm" onclick="copyOut()">コピー</button>
 <button class="gh sm" onclick="saveFile()">ファイル保存</button>
 <button class="gh sm" onclick="dlg('dImp')">読み込み</button>
-<label class="btn-label gh sm">
-📷 写真読取<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
-</label>
 </div>
 <textarea id=out readonly></textarea>
-<p class=note>「📷 写真読取」で帳票や画面を撮影すると自動で文字解析されます。その文字をAIチャットに貼るとデータ化できます。</p>
 </div>
 
 </div>
@@ -257,7 +251,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <script>
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url';
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxPv9oFvnqZhTcpEZVvDBNhTPlVxgM7ZuQUKgm6o1ldDH_uGceJfrTBlsNhPqIjz7-n/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
 
 const GEN=[['onigiri','おむすび','🍙'],['sushi','寿司','🍣'],['bento','弁当','🍱'],['chilled','チルド弁当','🧊'],
 ['pasta','パスタ','🍝'],['hiyashi','冷やし麺','🍧'],['hotmen','ホット麺','🍜'],['yakimen','焼麺','🍳'],
@@ -278,53 +272,61 @@ function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r
 function save(){try{localStorage.setItem(KEY,b64e(JSON.stringify(DB)));$('st').textContent='保存 '+hm()}
   catch(e){$('st').textContent='保存エラー'}}
 function hm(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
-function flash(t){$('st').textContent=t;setTimeout(()=>$('st').textContent='保存 '+hm(),1800)}
+function flash(t){$('st').textContent=t;setTimeout(()=>$('st').textContent='保存 '+hm(),2000)}
 let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
 function dlg(id){if(id==='dSet')renderSet();$(id).showModal()}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 
-/* ---------- クラウド同期 ---------- */
+/* ---------- クラウド同期 (CORS完全回避版) ---------- */
 function getGasUrl(){return localStorage.getItem(GAS_KEY)||DEFAULT_GAS_URL}
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
+
 async function cloudSave(){
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
   $('st').textContent='クラウド保存中...';
   try{
-    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)});
+    await fetch(url,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(DB)
+    });
     flash('☁️ クラウド保存完了');
   }catch(e){alert('クラウド保存に失敗しました');flash('保存失敗')}
 }
-async function cloudLoad(){
+
+function cloudLoad(){
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
   $('st').textContent='クラウド読込中...';
-  try{
-    const res=await fetch(url);
-    const data=await res.json();
-    if(data&&data.g){DB=data;save();renderAll();flash('☁️ クラウド読込完了')}
-    else{alert('Googleドライブに保存データがありませんでした')}
-  }catch(e){alert('クラウド読込に失敗しました');flash('読込失敗')}
-}
-
-/* ---------- 写真OCR読み取り処理 ---------- */
-async function handleImage(input){
-  if(!input.files||!input.files[0])return;
-  const file=input.files[0];
-  $('st').textContent='写真解析中...';
-  try{
-    flash('文字を解析しています...');
-    const res=await Tesseract.recognize(file,'jpn+eng');
-    const txt=res.data.text;
-    $('out').value="【写真から読み取ったテキスト】\n"+txt;
-    alert('写真をテキスト化しました。下の書き出し枠の内容をコピーしてAIチャットに送ると、発注データに一括変換できます。');
-    flash('写真解析完了');
-  }catch(e){
-    alert('写真の読み取りに失敗しました。チャットに直接画像を貼ってください。');
-    flash('解析失敗');
-  }
+  
+  const cbName = 'gasCallback_' + Date.now();
+  window[cbName] = function(data){
+    delete window[cbName];
+    if(script.parentNode) script.parentNode.removeChild(script);
+    if(data && data.g){
+      DB = data;
+      save();
+      renderAll();
+      flash('☁️ クラウド読込完了');
+    }else{
+      alert('Googleドライブに有効なデータがありませんでした');
+      flash('読込完了(空)');
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName + '&t=' + Date.now();
+  script.onerror = function(){
+    delete window[cbName];
+    if(script.parentNode) script.parentNode.removeChild(script);
+    alert('クラウド読込に失敗しました。GASのデプロイ設定をご確認ください。');
+    flash('読込失敗');
+  };
+  document.body.appendChild(script);
 }
 
 /* ---------- 曜日・マニュアル公式学習 ---------- */
