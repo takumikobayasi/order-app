@@ -167,7 +167,8 @@
 <div class="fg g2">
 <div><label>平常の週平均 販売数</label><input id=s_base type=number></div>
 <div><label>上乗せ倍率（企画中など）</label><input id=s_up type=number step=0.05></div></div>
-<div class=btns><button class=sm onclick="saveBase()">保存</button></div>
+<p class=note id=s_base_sug></p>
+<div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
 <div><label>日付</label><input id=tg_d placeholder="8/22"></div>
