@@ -1,6 +1,6 @@
 <!doctype html><html lang=ja><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>発注アプリ v3.6.6 (Stable)</title>
+<title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{color-scheme:light;--bg:#f9f9f7;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8b8a84;
@@ -164,7 +164,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <button class="gh sm" onclick="outCompact()">AIに送る（短い）</button>
 <button class="gh sm" onclick="outFull()">バックアップ</button>
 <button class="gh sm" onclick="copyOut()">コピー</button>
-<button class="gh sm" onclick="saveFile()">ファイル保存</button>
 <button class="gh sm" onclick="dlg('dImp')">読み込み</button>
 <label class="btn-label gh sm">
 📷 写真読取<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
@@ -270,7 +269,7 @@ const RAT0={weekday:[59,24,17],sat:[65,35,0],sun:[59,30,11]};
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
-// ★消してしまった初期データ（SEED）を完全に復元しました
+// ★SEEDデータ（初期のおにぎりデータ）
 const SEED={"onigiri": {"items": [{"id": "o00", "name": "大きな 生たらことまぐろ", "price": 313, "day": 8, "grade": "新", "unit": 1, "my": 13, "tag": "新", "memo": "新商品 8/18発売"}, {"id": "o01", "name": "具だくさん エビマヨネーズ", "price": 230, "day": 8, "grade": "新", "unit": 1, "my": 9, "tag": "新", "memo": "新商品 8/18発売"}, {"id": "o02", "name": "大きな 煮たまご肉そぼろ", "price": 322, "day": 5, "grade": "新", "unit": 1, "my": 13, "tag": "新", "memo": "新商品 8/18発売"}, {"id": "o03", "name": "具だくさん！チキン南蛮", "price": 248, "day": 5, "grade": "新", "unit": 1, "my": 9, "tag": "新", "memo": "新商品 8/18発売"}, {"id": "o04", "name": "直巻 和風ツナマヨネーズ", "price": 172, "day": 7.3, "grade": "◎", "unit": 1, "my": 9, "tag": "", "memo": ""}, {"id": "o05", "name": "直巻 焼しゃけ", "price": 184, "day": 6.9, "grade": "◎", "unit": 1, "my": 8, "tag": "", "memo": ""}, {"id": "o06", "name": "直巻 明太子マヨネーズ", "price": 184, "day": 5.7, "grade": "◎", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o07", "name": "直巻 とり五目", "price": 184, "day": 4.9, "grade": "◎", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o08", "name": "手巻 シーチキンマヨネーズ", "price": 184, "day": 7.4, "grade": "◎", "unit": 1, "my": 9, "tag": "", "memo": ""}, {"id": "o09", "name": "手巻 紀州南高梅", "price": 184, "day": 5.4, "grade": "◎", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o10", "name": "鮭はらみおむすび", "price": 276, "day": 6.1, "grade": "◎", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o11", "name": "手巻 真昆布", "price": 184, "day": 5.3, "grade": "◎", "unit": 1, "my": 8, "tag": "", "memo": ""}, {"id": "o12", "name": "手巻 紅しゃけ", "price": 218, "day": 5.5, "grade": "◎", "unit": 1, "my": 8, "tag": "", "memo": ""}, {"id": "o13", "name": "塩おむすび", "price": 139, "day": 3.7, "grade": "○", "unit": 1, "my": 0, "tag": "", "memo": "4週連続 廃棄ゼロ"}, {"id": "o14", "name": "手巻 辛子明太子", "price": 218, "day": 4.1, "grade": "○", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o15", "name": "シーチキン炊き込みごはん", "price": 147, "day": 3.7, "grade": "○", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o16", "name": "SPAM ツナマヨネーズ", "price": 276, "day": 3.0, "grade": "△", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o17", "name": "牛焼肉マヨネーズおむすび", "price": 230, "day": 2.4, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o18", "name": "ごま入りごはん 海苔佃煮", "price": 156, "day": 1.2, "grade": "×", "unit": 2, "my": 0, "tag": "", "memo": "直近16個"}, {"id": "o19", "name": "青磯海苔 漬けサーモン", "price": 221, "day": 2.0, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o20", "name": "大きな 昆布とツナマヨ", "price": 297, "day": 2.8, "grade": "△", "unit": 1, "my": 0, "tag": "取消", "memo": "8/24本部取消"}, {"id": "o21", "name": "おむすび2個 鮭・ツナマヨ", "price": 360, "day": 2.0, "grade": "△", "unit": 2, "my": 0, "tag": "", "memo": ""}, {"id": "o22", "name": "いか明太子と卵黄醤油おむ", "price": 237, "day": 1.8, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o23", "name": "赤飯おむすび", "price": 184, "day": 2.3, "grade": "△", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o24", "name": "おむすびおかずS", "price": 462, "day": 1.6, "grade": "×", "unit": 2, "my": 0, "tag": "", "memo": ""}, {"id": "o25", "name": "もち麦 ごまわかめ", "price": 156, "day": 1.9, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o26", "name": "だしごはん 昆布むすび", "price": 147, "day": 3.9, "grade": "○", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o27", "name": "チャーシューおむすび", "price": 209, "day": 2.0, "grade": "×", "unit": 2, "my": 0, "tag": "", "memo": ""}, {"id": "o28", "name": "鮭切身炙り 醤油おむすび", "price": 276, "day": 1.8, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o29", "name": "SPAM スクランブルエッグ", "price": 369, "day": 0.9, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o30", "name": "サンドおむすび 焼そば", "price": 331, "day": 1.0, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}, {"id": "o31", "name": "鮭だしごはん 鮭マヨおむ", "price": 147, "day": 2.1, "grade": "×", "unit": 1, "my": 0, "tag": "", "memo": ""}], "hist": [{"d": "8/17", "w": "晴", "ai": 134, "n": 134, "s": 123, "ha": 14, "nb": [106, 17, 11]}, {"d": "8/18", "w": "晴", "ai": 139, "n": 147, "s": 143, "ha": 1, "nb": [96, 38, 13]}], "tgt": {"8/21": {"q": 192, "a": 39293}}, "base": 115, "up": 1.1, "dow": {...DOW0}, "rat": JSON.parse(JSON.stringify(RAT0)), "cur": {"dt": "8/21", "carry": 20, "v": {}}}};
 let DB=null, MODE='o', SORT=false, EDIT=null;
 
@@ -753,10 +752,6 @@ function copyOut(){const t=$('out');if(!t.value){outCompact()}t.select();
   const done=()=>flash('コピーしました');
   if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(done).catch(()=>{document.execCommand('copy');done()});
   else{document.execCommand('copy');done()}}
-function saveFile(){if(!$('out').value)outFull();
-  const b=new Blob([$('out').value],{type:'text/plain'});const a=document.createElement('a');
-  a.href=URL.createObjectURL(b);a.download='hacchu_'+(($('dt').value||'').replace(/[^0-9]/g,'_')||'backup')+'.txt';
-  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);flash('保存しました')}
 function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
   if(!m){alert('バックアップの文字列が見つかりません');return}
   try{const d=JSON.parse(b64d(m[1]));if(!d.g)throw 0;DB=d;save();$('dImp').close();$('impbox').value='';
