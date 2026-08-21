@@ -14,10 +14,12 @@ function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0}
 function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',g}}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
-function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));$('st').textContent='保存 '+hm()}
+function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
+    $('st').textContent=(DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm()}
   catch(e){$('st').textContent='保存エラー'}}
 function hm(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
-function flash(t){$('st').textContent=t;setTimeout(()=>$('st').textContent='保存 '+hm(),2000)}
+function flash(t){$('st').textContent=t;
+  setTimeout(()=>$('st').textContent=(DB&&DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm(),2500)}
 let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
 function dlg(id){if(id==='dSet')renderSet();$(id).showModal()}
@@ -100,10 +102,11 @@ async function syncCloud(){
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
   $('st').textContent='同期中...';
   try{
+    DB.pendingSync=false;DB.ts=Date.now();DB.syncedTs=DB.ts;
     await fetch(url,{method:'POST',mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(DB)});
-    DB.pendingSync=false;save();
-    flash('☁️ 同期完了');
+    localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
+    flash('☁️ 同期完了 '+hm());
   }catch(e){
     DB.pendingSync=true;save();
     flash('⚠ 端末に一時保存');
@@ -111,15 +114,23 @@ async function syncCloud(){
   }
 }
 
-/* 起動時：クラウドの方が新しければ自動で読み込む（他の人の端末で同期された更新を反映） */
+/* 起動時：クラウドの方が新しければ自動で読み込む（他の人の端末で同期された更新を反映）
+   syncedTs＝最後にこの端末が同期した時点のts。クラウドのtsがそれと違えば
+   「他の端末で更新された」と判断して取り込む */
 function cloudLoadSilent(){
   const url=getGasUrl();if(!url)return;
   const cb='gasBoot_'+Date.now();
   const s=document.createElement('script');
   window[cb]=function(data){
     delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);
-    if(data&&data.g&&(data.ts||0)>(DB.ts||0)&&!DB.pendingSync){
-      DB=data;save();renderAll();flash('☁️ 最新データを反映');
+    if(!data||!data.g)return;
+    if(DB.pendingSync)return; // 未同期の変更が端末にある場合は上書きしない
+    const localSynced=DB.syncedTs||0;
+    if((data.ts||0)!==localSynced){
+      const keepUrl=localStorage.getItem(GAS_KEY);
+      DB=data;DB.syncedTs=data.ts||0;save();
+      if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
+      renderAll();flash('☁️ 最新データを反映');
     }
   };
   s.src=url+(url.includes('?')?'&':'?')+'callback='+cb+'&t='+Date.now();
