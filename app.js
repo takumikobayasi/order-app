@@ -34,7 +34,15 @@ function flash(t){$('st').textContent=t;
   setTimeout(()=>$('st').textContent=(DB&&DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm(),2500)}
 let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
-function dlg(id){if(id==='dSet')renderSet();$(id).showModal()}
+function dlg(id){
+  if(id==='dSet')renderSet();
+  if(id==='dMaster')renderBinMx();
+  $(id).showModal()
+}
+function openMasterFromSettings(){
+  $('dSet').close();
+  dlg('dMaster');
+}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 
