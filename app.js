@@ -629,6 +629,7 @@ function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
   G().tgt[+m[1]+'/'+ +m[2]]={q:Number($('tg_q').value)||0,a:Number($('tg_a').value)||0};
   renderSet();renderSetup();autosave()}
 function renderSet(){const g=G(),B=$('setbody');B.textContent='';
+  $('wipeToggle').style.display='';$('wipeBtn').style.display='none';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('loc_status').textContent='現在の地域: '+getLoc().name;
   const sug=suggestBase();
@@ -644,6 +645,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   const t=$('tglist');t.textContent=Object.keys(g.tgt).length
     ? '登録済: '+Object.entries(g.tgt).map(([k,v])=>`${k} ${v.q}個/${(v.a||0).toLocaleString()}円`).join('　')
     : '目標はまだありません'}
+function showWipe(){$('wipeToggle').style.display='none';$('wipeBtn').style.display='';}
 function wipe(){if(!confirm('この端末のデータを全部消します。よろしいですか'))return;
   localStorage.removeItem(KEY);location.hash='';location.reload()}
 
