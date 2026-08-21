@@ -401,9 +401,9 @@ function getAiAdoption(){
   });
   if(!total) return null;
   const rate=Math.round((match/total)*100);
-  let label='適正（利益最大ゾーン 70-80%）', cls='ok';
-  if(rate>85){label='ストコンAI依存過多（利益低下リスク）';cls='crit'}
-  else if(rate<65){label='意思入れ強め';cls='warn'}
+  let label='提案どおりが中心', cls='ok';
+  if(rate<40){label='提案から大きく調整して発注';cls='warn'}
+  else if(rate<70){label='一部を調整して発注';cls='ok'}
   return {rate,label,cls,match,total};
 }
 
@@ -431,10 +431,10 @@ function renderSetup(){
     ['曜日係数',i?`${i.d}曜 ${i.f.toFixed(2)}（${i.src}）`:'納品日を入れてください',i?'':'warn'],
     ['便構成比',i?`${i.type} ${i.r[0]}/${i.r[1]}/${i.r[2]}%`:'—',i?'ok':'warn'],
     ['締切状況',lockTxt+(LOCK_OVERRIDE?'（手動解除中）':''),LK.c0?'warn':'ok'],
-    ['ストコンAI採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'ストコンAI推奨未入力',aiAdp?aiAdp.cls:'warn'],
+    ['提案の採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'提案がまだありません',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
     ['今日の需要見込み（提案数）',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
-    ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
+    ['提案中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
   if(sp)rows.splice(2,0,['特殊カレンダー',`${sp}期間：ストコンAIの学習対象外のため意思入れ必須`,'crit']);
   // 数日おきに発注するカテゴリ向け：期限内に売り切れる上限と、次回までに必要な数
@@ -548,7 +548,7 @@ function renderItems(){
       sp.textContent=r.grade||'—';t2.appendChild(sp)}
     tr.appendChild(t2);
     const v=vv(r.id,MODE);
-    const LK=MODE==='o'?lockState():{c0:false,c12:false};
+    const LK=MODE==='i'?lockState():{c0:false,c12:false};
     const t6=document.createElement('td');t6.className='tot';
     BINS.forEach((i,ci)=>{const td=document.createElement('td');
       const inp=document.createElement('input');inp.type='number';inp.inputMode='numeric';
@@ -667,9 +667,14 @@ function alloc(){
   const g=G();if(!g.items.length){alert('先に商品を登録してください');return}
   applyDow();
   let tq=Number($('tq').value)||0;const ta=Number($('ta').value)||0;
-  const live=g.items.filter(r=>(r.day||0)>0);
-  if(!live.length){alert('日販が入っている商品がありません');return}
-  const W=live.reduce((a,r)=>a+edayOf(r),0);
+  // 「実際の発注」に便別の個数が入っている商品はその数をそのまま使い、
+  // 入力がない商品だけを目標総数から配分する
+  const hasDetail=r=>vv(r.id,'i').some(x=>x!=null);
+  const detailed=g.items.filter(r=>(r.day||0)>0&&hasDetail(r));
+  const detailedTotal=detailed.reduce((a,r)=>a+vv(r.id,'i').reduce((x,y)=>x+(y||0),0),0);
+  const detailedBin=[0,1,2].map(i=>detailed.reduce((a,r)=>a+(vv(r.id,'i')[i]||0),0));
+  const live=g.items.filter(r=>(r.day||0)>0&&!hasDetail(r));
+  if(!live.length&&!detailed.length){alert('日販が入っている商品がありません');return}
   let usedDemand=false;
   if(!tq&&!ta){
     const D=demand();
@@ -677,57 +682,68 @@ function alloc(){
     if(!confirm(`目標が未入力です。天気・曜日からの提案数(${D.q}個)を使って全商品の発注数を配分しますか？`))return;
     tq=D.q;usedDemand=true;
   }
-  let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/live.reduce((a,r)=>a+r.day,0)));
+  const priceBase=g.items.filter(r=>(r.day||0)>0);
+  let target=tq||Math.round(ta/(priceBase.reduce((a,r)=>a+r.price*r.day,0)/priceBase.reduce((a,r)=>a+r.day,0)));
+  target=Math.max(0,target-detailedTotal);          // 便別入力済みの分は目標から差し引く
 
-  const sorted=[...live].sort((a,b)=>edayOf(b)-edayOf(a));
-  const topCount=Math.max(1,Math.ceil(sorted.length*0.5));
-  const topIds=new Set(sorted.slice(0,topCount).map(r=>r.id));
+  const q={};let T=0,p1=0,p2=0,p3=0,R=[0,0,0];
+  if(live.length){
+    const sorted=[...live].sort((a,b)=>edayOf(b)-edayOf(a));
+    const topCount=Math.max(1,Math.ceil(sorted.length*0.5));
+    const topIds=new Set(sorted.slice(0,topCount).map(r=>r.id));
 
-  const base={},q={};
-  const W_top=sorted.slice(0,topCount).reduce((a,r)=>a+edayOf(r),0);
-  const minBotTotal=sorted.slice(topCount).reduce((a,r)=>a+Math.round(edayOf(r)),0);
-  const allocTop=Math.max(0,target-minBotTotal);
+    const base={};
+    const W_top=sorted.slice(0,topCount).reduce((a,r)=>a+edayOf(r),0);
+    const minBotTotal=sorted.slice(topCount).reduce((a,r)=>a+Math.round(edayOf(r)),0);
+    const allocTop=Math.max(0,target-minBotTotal);
 
-  live.forEach(r=>{
-    if(topIds.has(r.id)){
-      base[r.id]=W_top>0?(edayOf(r)/W_top*allocTop):edayOf(r);
-    }else{
-      base[r.id]=Math.max(1,Math.round(edayOf(r)));
-    }
-    q[r.id]=Math.max(r.my||1,Math.round(base[r.id]));
-  });
+    live.forEach(r=>{
+      if(topIds.has(r.id)){
+        base[r.id]=W_top>0?(edayOf(r)/W_top*allocTop):edayOf(r);
+      }else{
+        base[r.id]=Math.max(1,Math.round(edayOf(r)));
+      }
+      q[r.id]=Math.max(r.my||1,Math.round(base[r.id]));
+    });
 
-  const S=()=>live.reduce((a,r)=>a+q[r.id],0);
-  let gd=0;
-  while(S()>target&&gd++<900){
-    const k=live.filter(r=>q[r.id]>Math.max(r.my||1,1))
-      .sort((a,b)=>(q[b.id]-base[b.id])-(q[a.id]-base[a.id]))[0];if(!k)break;q[k.id]--}
-  gd=0;
-  while(S()<target&&gd++<900){
-    const k=live.slice().sort((a,b)=>(base[b.id]-q[b.id])-(base[a.id]-q[a.id]))[0];q[k.id]++}
-  const T=S();
+    const S=()=>live.reduce((a,r)=>a+q[r.id],0);
+    let gd=0;
+    while(S()>target&&gd++<900){
+      const k=live.filter(r=>q[r.id]>Math.max(r.my||1,1))
+        .sort((a,b)=>(q[b.id]-base[b.id])-(q[a.id]-base[a.id]))[0];if(!k)break;q[k.id]--}
+    gd=0;
+    while(S()<target&&gd++<900){
+      const k=live.slice().sort((a,b)=>(base[b.id]-q[b.id])-(base[a.id]-q[a.id]))[0];q[k.id]++}
+    T=S();
 
-  const gv=(id,d)=>{const v=$(id).value.trim();return v===''?d:Number(v)};
-  const R=[gv('r1',59),gv('r2',24),gv('r3',17)],RS=R[0]+R[1]+R[2];
-  const p1=R[0]/RS,p2=R[1]/RS,p3=R[2]/RS;
-  const n3=p3<=0?0:Math.max(2,Math.round(T*p3/2));
-  const top3=n3===0?[]:live.slice().sort((a,b)=>q[b.id]-q[a.id]).filter(r=>q[r.id]>=6).slice(0,n3).map(r=>r.id);
-  
-  g.items.forEach(r=>{
-    if(!(r.id in q)){setAll(r.id,[0,0,0]);return}
-    const t3=top3.includes(r.id)?2:0,rest=Math.max(0,q[r.id]-t3);
-    const t2=Math.round(rest*(p2/(p1+p2))),t1=rest-t2;
-    setAll(r.id,fix2([t1,t2,t3],r.unit))});
-  
+    // 便配分は「実際の発注」1便/2便/3便の総数（残り分）があればそれを優先し、なければ便構成比を使う
+    const remBin=[0,1,2].map(i=>Math.max(0,(gvAiBin(i))-detailedBin[i]));
+    const remSum=remBin[0]+remBin[1]+remBin[2];
+    const gv=(id,d)=>{const v=$(id).value.trim();return v===''?d:Number(v)};
+    R=remSum>0?remBin:[gv('r1',59),gv('r2',24),gv('r3',17)];
+    const RS=R[0]+R[1]+R[2]||1;
+    p1=R[0]/RS;p2=R[1]/RS;p3=R[2]/RS;
+    const n3=p3<=0?0:Math.max(2,Math.round(T*p3/2));
+    const top3=n3===0?[]:live.slice().sort((a,b)=>q[b.id]-q[a.id]).filter(r=>q[r.id]>=6).slice(0,n3).map(r=>r.id);
+
+    live.forEach(r=>{
+      const t3=top3.includes(r.id)?2:0,rest=Math.max(0,q[r.id]-t3);
+      const t2=Math.round(rest*(p2/(p1+p2))),t1=rest-t2;
+      setAll(r.id,fix2([t1,t2,t3],r.unit))});
+  }
+  detailed.forEach(r=>setAll(r.id,vv(r.id,'i').map(x=>x||0)));   // 便別入力済みはそのまま提案に反映
+  g.items.forEach(r=>{if(!(r.id in q)&&!hasDetail(r))setAll(r.id,[0,0,0])});
+
   MODE='o';setMode('o');paintTotals();autosave();
   const s=sums('o');
   $('allocnote').className='note ok';
   $('allocnote').textContent=`${s.T}個 / ${s.amt.toLocaleString()}円　便別${R.join('/')}%`
+    +(detailed.length?`　便別入力済み${detailed.length}品(${detailedTotal}個)はそのまま使用`:'')
     +(usedDemand?`　※目標未入力のため天気・曜日からの提案数(${tq}個)を使用`:'')
     +(tq&&!usedDemand?`　個数目標の${Math.round(s.T/tq*100)}%`:'')+(ta?`　金額目標の${Math.round(s.amt/ta*100)}%`:'')}
+function gvAiBin(i){const v=$('ai'+(i+1)).value.trim();return v===''?0:Number(v)}
 function setAll(id,v){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
-  const LK=lockState(),old=c[id].o;
-  c[id].o=v.map((x,i)=>((i===0&&LK.c0)||(i>0&&LK.c12))?old[i]:x)}
+  c[id].o=v.slice()}
 
 /* ---------- 商品編集 ---------- */
 function editItem(ix){EDIT=ix;const r=ix==null?{}:G().items[ix];
@@ -767,7 +783,7 @@ function loadHistDate(d){
   const sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
   // 便別納品：記録済みならそれを、なければその日の発注データから自動入力
   let nb=r.nb;
-  if(!nb&&g.cur.dt===d){const s=sums('o');if(s.T)nb=s.b}
+  if(!nb&&g.cur.dt===d){const s=sums('i');if(s.T)nb=s.b}
   nb=nb||[null,null,null];
   set('h_n1',nb[0]);set('h_n2',nb[1]);set('h_n3',nb[2]);
   if(!r.n&&nb.some(x=>x!=null))set('h_n',nb.reduce((a,x)=>a+(x||0),0));
@@ -1154,7 +1170,7 @@ function outPrompt(){
   const D=demand(), aiAdp=getAiAdoption(), sp=specialPeriod(dv);
   const ch=[];g.items.forEach(r=>{
     const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
-    if(Math.abs(a-b)>=2&&(a||b))ch.push(`${r.name}: ストコンAI推奨${b}個 → 自店発注${a}個 (日販${r.day||0})`)});
+    if(Math.abs(a-b)>=2&&(a||b))ch.push(`${r.name}: 提案${a}個 → 実際の発注${b}個 (日販${r.day||0})`)});
   const h=g.hist.slice(-4).map(x=>`- ${x.d}(${x.w||'天気不明'}): 納品${x.n??'-'} / 販売${x.s??'-'} / 廃棄${x.ha??'-'} (消化率:${x.n&&x.s?(x.s/x.n*100).toFixed(0)+'%':'-'})${x.m?' ['+x.m+']':''}`);
 
   const p=[
@@ -1162,18 +1178,18 @@ function outPrompt(){
     `対象カテゴリ: ${g.name}`,
     `対象日: ${dv}${i?' ('+i.d+'曜・係数'+i.f.toFixed(2)+')':''}`,
     ...(sp?[`⚠ 特殊カレンダー: ${sp}期間（ストコンAIの学習対象外のため参考程度に）`]:[]),
-    `ストコンAI採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
+    `提案の採用率: ${aiAdp?aiAdp.rate+'% ('+aiAdp.label+')':'未計算'}`,
     `本部目標: ${t?t.q+'個 / '+(t.a||0).toLocaleString()+'円':'未設定'}`,
     `需要見込み(提案数): ${D?D.q+'個 ('+D.src+')':'未設定'}`,
     ...((()=>{const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
       return aiT?[`ストコンAI推奨合計(推奨値反映${$('aiver').value?'・'+$('aiver').value:''}): ${aiT}個（1便${$('ai1').value||0}/2便${$('ai2').value||0}/3便${$('ai3').value||0}）`]:[]})()),
-    `発注合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
+    `提案合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
     `\n## 直近の実績推移`,
     h.length?h.join('\n'):'実績データなし',
-    `\n## ストコンAI推奨からの主な変更商品（±2個以上）`,
+    `\n## 提案からの主な変更商品（±2個以上）`,
     ch.length?ch.join('\n'):'大きな変更なし',
     `\n## 相談内容`,
-    `ファミマ発注マニュアルの「ストコンAI採用率70-80%最適化」および「主力品への売場ボリューム集中」を踏まえ、上記の発注バランスに機会ロスや過剰廃棄のリスクがないか評価・改善提案をお願いします。`
+    `ファミマ発注マニュアルの「主力品への売場ボリューム集中」を踏まえ、上記の提案と実際の発注のバランスに機会ロスや過剰廃棄のリスクがないか評価・改善提案をお願いします。`
   ];
   $('out').value=p.join('\n');
 }
@@ -1182,14 +1198,14 @@ function outCompact(){const g=G(),s=sums('o'),ai=sums('i'),ac=sums('a');
   const dv=($('dt').value||'').trim(), aiAdp=getAiAdoption();
   const L=[`#${g.name} ${dv}${(i&&!/[月火水木金土日]/.test(dv))?'('+i.d+')':''}`];
   if(t)L.push(`目標 ${t.q}個 ${t.a}円`);
-  if(s.T)L.push(`発注 ${s.b.join('/')}=${s.T} ${s.amt}円`);
-  if(ai.T)L.push(`ストコンAI ${ai.b.join('/')}=${ai.T}${aiAdp?' (採用率'+aiAdp.rate+'%)':''}`);
+  if(s.T)L.push(`提案 ${s.b.join('/')}=${s.T} ${s.amt}円`);
+  if(ai.T)L.push(`実際の発注 ${ai.b.join('/')}=${ai.T}${aiAdp?' (採用率'+aiAdp.rate+'%)':''}`);
   if(ac.T)L.push(`実績 納品/販売/廃棄 ${ac.b.join('/')}`);
   const ch=[];g.items.forEach(r=>{const a=vv(r.id,'o').reduce((x,y)=>x+(y||0),0),
     b=vv(r.id,'i').reduce((x,y)=>x+(y||0),0);
-    if(Math.abs(a-b)>=3&&(a||b))ch.push({n:r.name,d:a-b,t:`${r.name}${b}→${a}`})});
+    if(Math.abs(a-b)>=3&&(a||b))ch.push({n:r.name,d:a-b,t:`${r.name}${a}→${b}`})});
   ch.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
-  if(ch.length)L.push('ストコンAI比±3以上 '+ch.slice(0,8).map(x=>x.t).join(' ')+(ch.length>8?` 他${ch.length-8}品`:''));
+  if(ch.length)L.push('提案比±3以上 '+ch.slice(0,8).map(x=>x.t).join(' ')+(ch.length>8?` 他${ch.length-8}品`:''));
   const h=g.hist.slice(-3).map(x=>`${x.d} 納${x.n??'-'} 販${x.s??'-'} 廃${x.ha??'-'}${x.w?' '+x.w:''}`);
   if(h.length)L.push('直近 '+h.join(' | '));
   $('out').value=L.join('\n')}
