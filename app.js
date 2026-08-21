@@ -904,7 +904,9 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
 /* ---------- 便と廃棄の時間マスタ（ジャンルごとに固定） ---------- */
 /* Day0=発注日。納品も廃棄も同じ時間軸で持つので、店に並ぶ時間を引き算で出せる */
 const BINT=[2,5,11,14,18,21,24];
-const BMDAYS=[[0,'発注日'],[1,'翌日'],[2,'2日後'],[3,'3日後'],[4,'4日後'],[5,'5日後'],[6,'6日後']];
+/* 納品は発注日から数え、廃棄は納品日から数える（納品物の表示どおりに入れられる） */
+const BMDAYS={deliv:[[0,'発注日']  ,[1,'翌日'],[2,'2日後'],[3,'3日後']],
+              waste:[[0,'納品当日'],[1,'1日後'],[2,'2日後'],[3,'3日後'],[4,'4日後'],[5,'5日後']]};
 function binmx(g){
   g=g||G();
   if(!g.binmx)g.binmx={deliv:[],waste:[]};
@@ -912,6 +914,11 @@ function binmx(g){
     if(!Array.isArray(g.binmx[k]))g.binmx[k]=[];
     for(let i=0;i<3;i++)if(!g.binmx[k][i])g.binmx[k][i]={d:null,t:[]};
     g.binmx[k].length=3});
+  // 旧版は廃棄も発注日から数えていたため、納品日からの日数に直す
+  if(!g.binmx.rel){
+    for(let i=0;i<3;i++){const dv=g.binmx.deliv[i],wt=g.binmx.waste[i];
+      if(wt.d!=null&&dv.d!=null)wt.d=Math.max(0,wt.d-dv.d)}
+    g.binmx.rel=true}
   return g.binmx}
 function bmGenKey(){const el=$('bm_gen');return (el&&el.value)||DB.active}
 function bmGroup(){return DB.g[bmGenKey()]||G()}
@@ -924,17 +931,18 @@ function toggleBinT(kind,i,t,on){const m=binmx(bmGroup()),a=m[kind][i];
 function binSpan(g,i){
   const m=binmx(g),dv=m.deliv[i],wt=m.waste[i];
   if(dv.d==null||!dv.t.length||wt.d==null||!wt.t.length)return null;
-  const from=dv.d*24+Math.min(...dv.t), to=wt.d*24+Math.max(...wt.t);
+  const from=dv.d*24+Math.min(...dv.t), to=(dv.d+wt.d)*24+Math.max(...wt.t);
   return to>from?to-from:null}
 function binSummaryLines(g){
   const m=binmx(g),out=[];
   for(let i=0;i<3;i++){
     const dv=m.deliv[i],wt=m.waste[i];
     if(dv.d==null&&!dv.t.length&&wt.d==null&&!wt.t.length)continue;
-    const dayName=d=>d==null?'？':(BMDAYS[d]?BMDAYS[d][1]:d+'日後');
+    const dayName=(kind,d)=>{if(d==null)return '？';
+      const f=BMDAYS[kind].find(x=>x[0]===d);return f?f[1]:d+'日後'};
     const times=a=>a&&a.length?a.join('時・')+'時':'？時';
     const sp=binSpan(g,i);
-    out.push(`${i+1}便：${dayName(dv.d)}${dv.t.length?' '+times(dv.t):''}納品 → ${dayName(wt.d)} ${times(wt.t)}廃棄`
+    out.push(`${i+1}便：${dayName('deliv',dv.d)}${dv.t.length?' '+times(dv.t):''}納品 → 納品の${dayName('waste',wt.d)} ${times(wt.t)}廃棄`
       +(sp?`（店に並ぶ ${sp}時間）`:''));
   }
   return out}
@@ -977,7 +985,7 @@ function renderBinMx(){
   BINT.forEach(t=>{const e=document.createElement('th');e.style.textAlign='center';e.textContent=t+'時';hr.appendChild(e)});
   th.appendChild(hr);
   const tb=$('bmtb');tb.textContent='';
-  [['deliv','納品日'],['waste','廃棄']].forEach(([kind,label])=>{
+  [['deliv','納品日（発注日から数える）'],['waste','廃棄（納品日から数える）']].forEach(([kind,label])=>{
     const hd=document.createElement('tr');
     const hc=document.createElement('td');hc.className='l';hc.colSpan=2+BINT.length;
     hc.style.fontWeight='700';hc.style.background='var(--bg)';hc.textContent=label;
@@ -988,7 +996,7 @@ function renderBinMx(){
       const c2=document.createElement('td');
       const ds=document.createElement('select');ds.style.padding='4px 2px';ds.style.fontSize='12px';
       const blank=document.createElement('option');blank.value='';blank.textContent='—';ds.appendChild(blank);
-      BMDAYS.forEach(([v,nm])=>{const o=document.createElement('option');o.value=v;o.textContent=nm;ds.appendChild(o)});
+      BMDAYS[kind].forEach(([v,nm])=>{const o=document.createElement('option');o.value=v;o.textContent=nm;ds.appendChild(o)});
       ds.value=m[kind][i].d==null?'':String(m[kind][i].d);
       ds.onchange=e=>setBinDay(kind,i,e.target.value);
       c2.appendChild(ds);tr.appendChild(c2);
