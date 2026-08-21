@@ -551,7 +551,8 @@ function renderAll(){renderTabs();
   $('wthr').value=g.cur.wthr||'';
   const ai=g.cur.ai||[null,null,null];
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
-  $('aiver').value=g.cur.aiVer||'';
+  // 未選択なら今の時刻から最新の配信版を初期表示する（表示と選択のズレを防ぐ）
+  $('aiver').value=g.cur.aiVer||aiVersionNow().cur;
   applyDow();renderItems();renderHist();renderSetup();renderWeekly()}
 
 /* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
