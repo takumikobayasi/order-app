@@ -36,6 +36,7 @@
 <div><label class=stoconai>ストコンAI 3便</label><input id=ai3 type=number></div>
 <div><label class=stoconai>配信版</label><select id=aiver><option value="">未選択</option><option>7:30版</option><option>18時版</option><option>13:00版</option></select></div>
 </div>
+<div class=btns style="margin-top:8px"><button class="gh sm" onclick="openHist()">＋前日の廃棄・実績を記録</button></div>
 <div id=setup class=row-grid></div>
 <p class=note id=setupmsg></p>
 </div>
@@ -79,33 +80,7 @@
 </div>
 
 <div class=card>
-<h2><span class=n>3</span>履歴</h2>
-<div class=btns><button class="gh sm" onclick="openHist()">＋今日の実績を記録</button></div>
-<div class=hscrollrow>
-<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',-1)">◀</button>
-<div class=hscroll id=htwrap style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
-<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
-</div>
-</div>
-
-<div class=card>
-<h2><span class=n>4</span>書き出し・AI連携・カメラ取込</h2>
-<div class=btns>
-<button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
-<button class="gh sm" onclick="outCompact()">AIに送る（短い）</button>
-<button class="gh sm" onclick="outFull()">バックアップ</button>
-<button class="gh sm" onclick="copyOut()">コピー</button>
-<button class="gh sm" onclick="dlg('dImp')">読み込み</button>
-<label class="btn-label gh sm">
-📷 写真読取<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
-</label>
-</div>
-<p class=note id=ocrst>「📷 写真読取」で帳票や画面を撮影すると自動で文字解析されます。その文字をAIチャットに貼るとデータ化できます。（解析には10〜30秒ほどかかります）</p>
-<textarea id=out readonly></textarea>
-</div>
-
-<div class=card>
-<h2><span class=n>5</span>週次データ取り込み（写真→AI→貼り付け）</h2>
+<h2><span class=n>3</span>週次データ取り込み（写真→AI→貼り付け）</h2>
 <div id=wklist class=row-grid></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
@@ -203,6 +178,26 @@
 <div class=btns><button class=sm onclick="saveTgt()">目標を登録</button></div>
 <div id=tglist class=note></div>
 <div id=setbody style="margin-top:12px"></div>
+<h2 style="margin-top:14px">履歴（実績データ）</h2>
+<div class=hscrollrow>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',-1)">◀</button>
+<div class=hscroll id=htwrap style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
+</div>
+<p class=note>曜日係数の学習・週平均の提案に使われます。普段は見なくて大丈夫です。</p>
+<h2 style="margin-top:14px">書き出し・AI連携・カメラ取込</h2>
+<div class=btns>
+<button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
+<button class="gh sm" onclick="outCompact()">AIに送る（短い）</button>
+<button class="gh sm" onclick="outFull()">バックアップ</button>
+<button class="gh sm" onclick="copyOut()">コピー</button>
+<button class="gh sm" onclick="dlg('dImp')">読み込み</button>
+<label class="btn-label gh sm">
+📷 写真読取<input type=file accept="image/*" capture="environment" style="display:none" onchange="handleImage(this)">
+</label>
+</div>
+<p class=note id=ocrst>「📷 写真読取」で帳票や画面を撮影すると自動で文字解析されます。</p>
+<textarea id=out readonly></textarea>
 <div class=btns style="margin-top:12px">
 <button class=gh onclick="document.getElementById('dSet').close()">閉じる</button>
 <button class=gh style="color:var(--crit)" onclick="wipe()">全部消す</button></div></dialog>
