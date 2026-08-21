@@ -614,10 +614,13 @@ function openHist(){
   loadHistDate((t.getMonth()+1)+'/'+t.getDate());
   $('dHist').showModal()}
 function loadHistDate(d){
-  const g=G(),r=g.hist.find(x=>x.d===d)||{};
+  const g=G(),Y=new Date().getFullYear();
+  const r=g.hist.find(x=>x.d===d&&(x.y||Y)===Y)||{};
   const set=(id,v)=>$(id).value=(v===null||v===undefined)?'':v;
   set('h_d',d);set('h_w',r.w);set('h_ai',r.ai);set('h_n',r.n);set('h_s',r.s);set('h_ha',r.ha);
-  set('h_kk',r.kk);set('h_k',r.k);set('h_m',r.m);
+  set('h_m',r.m);
+  // 去年の同時期のメモを表示（なぜうまくいった/いかなかったかの振り返り用）
+  showLastYearNote(d);
   const sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
   // 便別納品：記録済みならそれを、なければその日の発注データから自動入力
   let nb=r.nb;
@@ -627,6 +630,51 @@ function loadHistDate(d){
   if(!r.n&&nb.some(x=>x!=null))set('h_n',nb.reduce((a,x)=>a+(x||0),0));
   set('h_s1',sb[0]);set('h_s2',sb[1]);set('h_s3',sb[2]);
   set('h_ha1',hab[0]);set('h_ha2',hab[1]);set('h_ha3',hab[2]);
+}
+/* ---------- メモ一覧（週ごと/月ごとにまとめて表示） ---------- */
+let MEMO_VIEW='month';
+function setMemoView(v){MEMO_VIEW=v;
+  $('memoWeek').setAttribute('aria-pressed',String(v==='week'));
+  $('memoMonth').setAttribute('aria-pressed',String(v==='month'));
+  renderMemos()}
+function renderMemos(){
+  const el=$('memolist');if(!el)return;el.textContent='';
+  const Y=new Date().getFullYear(),groups={};
+  (G().hist||[]).forEach(h=>{
+    if(!h.m)return;
+    const m=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
+    const y=h.y||Y;
+    const key=MEMO_VIEW==='month'
+      ? `${y}年${+m[1]}月`
+      : `${y}年 ${weekKey(new Date(y,+m[1]-1,+m[2]))}の週`;
+    (groups[key]=groups[key]||[]).push(`${h.d} ${h.m}`);
+  });
+  const keys=Object.keys(groups);
+  if(!keys.length){const p=document.createElement('div');p.className='note';
+    p.textContent='まだメモがありません。実績記録のメモ欄に施策やイベントを書くとここにまとまります。';
+    el.appendChild(p);return}
+  keys.reverse().forEach(k=>{
+    const w=document.createElement('div');w.className='row';
+    const a=document.createElement('div');a.className='k';a.textContent=k;
+    const b=document.createElement('div');b.className='v';b.textContent=groups[k].join(' ／ ');
+    w.append(a,b);el.appendChild(w)});
+}
+/* 去年の同時期（前後3日）に残したメモを探して表示する */
+function showLastYearNote(d){
+  const el=$('h_lastyear');if(!el)return;el.textContent='';el.className='note';
+  const m=(d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
+  const thisYear=new Date().getFullYear();
+  const target=new Date(thisYear,+m[1]-1,+m[2]);
+  const hits=[];
+  (G().hist||[]).forEach(h=>{
+    if(!h.m)return;
+    const hy=h.y||thisYear; if(hy>=thisYear)return; // 今年の分は対象外
+    const hm=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!hm)return;
+    const hd=new Date(thisYear,+hm[1]-1,+hm[2]);
+    if(Math.abs((hd-target)/86400000)<=3)hits.push(`${hy}年 ${h.d}: ${h.m}`);
+  });
+  if(hits.length){el.className='note ok';
+    el.textContent='📌 去年の同時期のメモ … '+hits.slice(0,3).join(' ／ ')}
 }
 function shiftHistDate(dir){
   const m=($('h_d').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
@@ -638,12 +686,14 @@ function shiftHistDate(dir){
 function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)};
   const d=$('h_d').value.trim()||$('dt').value.trim();if(!d){alert('日付を入れてください');return}
   const nb=[n('h_n1'),n('h_n2'),n('h_n3')],sb=[n('h_s1'),n('h_s2'),n('h_s3')],hab=[n('h_ha1'),n('h_ha2'),n('h_ha3')];
-  const i=G().hist.findIndex(h=>h.d===d);
+  const Y=new Date().getFullYear();
+  const i=G().hist.findIndex(h=>h.d===d&&(h.y||Y)===Y);
   const old=i>=0?G().hist[i]:{};
   const pick=(v,o)=>v===null||v===''||v===undefined?(o??null):v;
   const rec={d,w:pick($('h_w').value.trim(),old.w),ai:pick(n('h_ai'),old.ai),n:pick(n('h_n'),old.n),
-    s:pick(n('h_s'),old.s),ha:pick(n('h_ha'),old.ha),kk:pick(n('h_kk'),old.kk),k:pick(n('h_k'),old.k),
-    m:pick($('h_m').value.trim(),old.m),am:old.am??null,
+    s:pick(n('h_s'),old.s),ha:pick(n('h_ha'),old.ha),
+    m:pick($('h_m').value.trim(),old.m),am:old.am??null,kk:old.kk??null,k:old.k??null,
+    y:old.y??Y,
     nb:nb.some(x=>x!==null)?nb:(old.nb||null),sb:sb.some(x=>x!==null)?sb:(old.sb||null),
     hab:hab.some(x=>x!==null)?hab:(old.hab||null)};
   if(rec.ha==null&&rec.hab)rec.ha=rec.hab.reduce((a,x)=>a+(x||0),0);
@@ -671,6 +721,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('wipeToggle').style.display='';$('wipeBtn').style.display='none';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('loc_status').textContent='現在の地域: '+getLoc().name;
+  renderMemos();
   const sug=suggestBase();
   $('s_base_sug').textContent=sug?`実績平均(特殊カレンダー・当日除く、${sug.n}日分): ${sug.avg}個`:'実績データがまだ足りません';
   const L=learnDow();
