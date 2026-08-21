@@ -273,6 +273,15 @@ function lockState(){
   if(LOCK_OVERRIDE)return{c0:false,c12:false};
   const t=new Date().getHours()*60+new Date().getMinutes();
   return{c0:t>=600,c12:t>=900}}
+/* ストコンAI推奨値は1日に複数回配信される。今の時刻でどの版が最新かと、
+   次にいつ更新されるかを返す（深夜勤務で前夜の版を見ているケースを明示するため） */
+function aiVersionNow(){
+  const n=new Date(), t=n.getHours()*60+n.getMinutes();
+  if(t<450)  return{cur:'18時版', next:'7:30',  nextMin:450,  note:'前夜18時配信の版が最新'};
+  if(t<780)  return{cur:'7:30版', next:'13:00', nextMin:780,  note:'当日7:30配信の版が最新'};
+  if(t<1080) return{cur:'13:00版',next:'18:00', nextMin:1080, note:'当日13:00配信の版が最新'};
+  return{cur:'18時版', next:'翌7:30', nextMin:null, note:'18時配信の版が最新'};
+}
 function learnDow(){const g=G(),by={},all=[];
   g.hist.forEach(h=>{const d=dowOf(h.d);if(!d||h.s==null)return;(by[d]=by[d]||[]).push(h.s);all.push(h.s)});
   if(all.length<7)return null;
@@ -389,6 +398,13 @@ function renderSetup(){
     }
   }
   if(g.binNote)rows.splice(rows.length-1,0,['便構成',g.binNote,'']);
+  // ストコンAIの配信版と、次の更新までの時間を表示
+  const av=aiVersionNow(), selVer=$('aiver').value;
+  const mismatch=selVer&&selVer!==av.cur;
+  rows.splice(4,0,['ストコンAI配信版',
+    `いま最新は${av.cur}（${av.note}）／次の更新 ${av.next}`
+    +(mismatch?`　⚠ 入力済みは${selVer}のため${av.cur}と差がある可能性`:''),
+    mismatch?'warn':'']);
   const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
   if(aiT&&dem){
     const diff=Math.round((dem-aiT)/aiT*100);
@@ -1017,8 +1033,10 @@ document.querySelectorAll('.hscroll').forEach(enableDragScroll);
   renderSetup();autosave()}));
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
+  // 配信版が未選択なら、入力時刻から最新版を自動で選ぶ
+  if(!$('aiver').value){$('aiver').value=aiVersionNow().cur;G().cur.aiVer=$('aiver').value}
   renderSetup();autosave()}));
-$('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;autosave()});
+$('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;renderSetup();autosave()});
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
 /* 保存データが空(商品0件かつ履歴0件)なら初期データから復旧する。
