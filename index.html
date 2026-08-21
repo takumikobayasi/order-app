@@ -201,7 +201,8 @@
 <textarea id=out readonly></textarea>
 <div class=btns style="margin-top:12px">
 <button class=gh onclick="document.getElementById('dSet').close()">閉じる</button>
-<button class=gh style="color:var(--crit)" onclick="wipe()">全部消す</button></div></dialog>
+<button class="gh sm" id=wipeToggle onclick="showWipe()" style="opacity:.4">…</button>
+<button class=gh id=wipeBtn style="color:var(--crit);display:none" onclick="wipe()">全部消す</button></div></dialog>
 
 <dialog id=dImp><h2>読み込み</h2>
 <p class=note>バックアップの文字列を貼り付けてください。</p>
