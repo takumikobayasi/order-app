@@ -660,6 +660,8 @@ function enableDragScroll(el){
   el.addEventListener('pointercancel',end);
   el.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation()}},true);
 }
+function hscrollBy(id,dir){const el=$(id);if(!el)return;
+  el.scrollBy({left:dir*160,behavior:'smooth'})}
 document.querySelectorAll('.hscroll').forEach(enableDragScroll);
 
 /* ---------- 起動 ---------- */

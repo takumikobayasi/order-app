@@ -11,7 +11,11 @@
 <button class="gh sm" onclick="toggleTheme()">◐</button>
 <button class="gh sm" onclick="dlg('dSet')">設定</button>
 </div>
+<div class=hscrollrow>
+<button class="gh sm hsbtn" onclick="hscrollBy('tabs',-1)">◀</button>
 <div class="tabs hscroll" id=tabs></div>
+<button class="gh sm hsbtn" onclick="hscrollBy('tabs',1)">▶</button>
+</div>
 </header>
 
 <div class=wrap>
@@ -66,13 +70,21 @@
 <button class="gh sm" onclick="editItem(null)">＋商品</button>
 <button class="gh sm" id=lockb aria-pressed=false onclick="toggleLockOverride()">🔒 締切ロック解除</button>
 </div>
-<div class=hscroll style="overflow-x:auto"><table><thead id=ith></thead><tbody id=itb></tbody></table></div>
+<div class=hscrollrow>
+<button class="gh sm hsbtn" onclick="hscrollBy('itwrap',-1)">◀</button>
+<div class=hscroll id=itwrap style="overflow-x:auto"><table><thead id=ith></thead><tbody id=itb></tbody></table></div>
+<button class="gh sm hsbtn" onclick="hscrollBy('itwrap',1)">▶</button>
+</div>
 </div>
 
 <div class=card>
 <h2><span class=n>3</span>履歴</h2>
 <div class=btns><button class="gh sm" onclick="openHist()">＋今日の実績を記録</button></div>
-<div class=hscroll style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
+<div class=hscrollrow>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',-1)">◀</button>
+<div class=hscroll id=htwrap style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
+</div>
 </div>
 
 <div class=card>

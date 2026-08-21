@@ -10,11 +10,15 @@ padding:0 0 95px}
 header{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--bd)}
 .hbar{display:flex;align-items:center;gap:12px;padding:10px 14px;max-width:1100px;margin:0 auto}
 .hbar h1{font-size:17px;margin:0;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 10px;max-width:1100px;margin:0 auto;scrollbar-width:none}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 10px;flex:1;min-width:0;scrollbar-width:thin}
 .hscroll{cursor:grab;-webkit-user-drag:none}
 .hscroll,.hscroll *{user-select:none;-webkit-user-select:none}
 .hscroll.dragging{cursor:grabbing}
-.tabs::-webkit-scrollbar{display:none}
+.hscroll::-webkit-scrollbar{height:8px}
+.hscroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.hscrollrow{display:flex;align-items:center;gap:4px;max-width:1100px;margin:0 auto}
+.hscrollrow>.hscroll{flex:1;min-width:0}
+.hsbtn{flex:0 0 auto;padding:6px 9px;font-size:13px}
 .tab{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;
 border:1px solid var(--bd);border-radius:12px;background:var(--card);cursor:pointer;min-width:68px}
 .tab .ic{font-size:20px;line-height:1.1}
