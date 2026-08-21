@@ -962,9 +962,9 @@ function binSummaryLines(g){
   const m=binmx(g),out=[];
   for(let i=0;i<3;i++){
     const dv=m.deliv[i],wt=m.waste[i];
-    if(!dv.t.length&&!wt.t.length)continue;
+    if(!wt.t.length)continue;
     const times=a=>a&&a.length?a.join('時・')+'時':'未設定';
-    out.push(`${i+1}便：納品 ${times(dv.t)} → 廃棄 ${times(wt.t)}`);
+    out.push(`${i+1}便：廃棄 ${times(wt.t)}`);
   }
   return out}
 /* マスタに登録のある便だけを使う。未登録のジャンルは従来どおり1〜3便すべて */
@@ -974,7 +974,7 @@ function binsUsed(g){
   const m=binmx(g),out=[];
   for(let i=0;i<3;i++){
     const dv=m.deliv[i],wt=m.waste[i];
-    if(dv.t.length||wt.t.length)out.push(i)}
+    if(wt.t.length)out.push(i)}
   return out.length?out:[0,1,2]}
 /* 便の見出しに廃棄時刻を添える（例「2便 14時廃棄」） */
 function binLabel(g,i,short){
@@ -1006,7 +1006,7 @@ function renderBinMx(){
   BINT.forEach(t=>{const e=document.createElement('th');e.style.textAlign='center';e.textContent=t+'時';hr.appendChild(e)});
   th.appendChild(hr);
   const tb=$('bmtb');tb.textContent='';
-  [['deliv','納品時刻'],['waste','廃棄時刻']].forEach(([kind,label])=>{
+  [['waste','廃棄時刻']].forEach(([kind,label])=>{
     const hd=document.createElement('tr');
     const hc=document.createElement('td');hc.className='l';hc.colSpan=2+BINT.length;
     hc.style.fontWeight='700';hc.style.background='var(--bg)';hc.textContent=label;

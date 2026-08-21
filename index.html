@@ -9,7 +9,7 @@
 <div class=hbar>
 <h1 id=title>発注アプリ</h1>
 <button class="gh sm" onclick="toggleTheme()">◐</button>
-<button class="gh sm" onclick="dlg('dMaster')">販売マスター</button>
+<button class="gh sm" onclick="dlg('dMaster')">廃棄期限マスター</button>
 <button class="gh sm" onclick="dlg('dSet')">設定</button>
 </div>
 <div class=hscrollrow>
@@ -181,8 +181,8 @@
 <p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 <h2 style="margin-top:14px">販売・廃棄マスター</h2>
-<p class=note>ジャンルごとの便・廃棄時刻は、画面上部の「販売マスター」から登録します。</p>
-<div class=btns><button class=sm onclick="openMasterFromSettings()">販売マスターを開く</button></div>
+<p class=note>ジャンルごとの廃棄時刻は、画面上部の「廃棄期限マスター」から登録します。</p>
+<div class=btns><button class=sm onclick="openMasterFromSettings()">廃棄期限マスターを開く</button></div>
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
 <div><label>日付</label><input id=tg_d placeholder="8/22"></div>
@@ -223,12 +223,12 @@
 <button class=gh id=wipeBtn style="color:var(--crit);display:none" onclick="wipe()">全部消す</button></div></dialog>
 
 <dialog id=dMaster>
-<h2>販売マスター</h2>
-<p class=note>ジャンルごとに、便ごとの納品時刻と廃棄時刻を登録します。登録した内容は発注画面の便表示と提案数の計算に使います。</p>
-<h3>ジャンル別の便・廃棄時間</h3>
+<h2>廃棄期限マスター</h2>
+<p class=note>ジャンルごとに、便ごとの廃棄時刻を登録します。登録した内容は発注画面の便表示と提案数の計算に使います。</p>
+<h3>ジャンル別の廃棄時刻</h3>
 <div class="fg"><div><label>ジャンル</label><select id=bm_gen onchange="bmSwitchGen()"></select></div></div>
 <div id=bmwrap style="overflow-x:auto"><table id=bmtbl><thead id=bmth></thead><tbody id=bmtb></tbody></table></div>
-<p class=note id=bmhelp>「おむすび1便は5時納品、14時廃棄」のように、便ごとの時刻をチェックしてください。複数回ある場合は複数の時刻を選べます。使わない便は空のままで大丈夫です。</p>
+<p class=note id=bmhelp>「おむすび1便は14時廃棄」のように、便ごとの廃棄時刻をチェックしてください。複数回ある場合は複数の時刻を選べます。使わない便は空のままで大丈夫です。</p>
 <div id=bmsum class=note></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" id=bmEditBtn onclick="bmEdit(true)">編集する</button>
