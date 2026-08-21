@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=202608210650">
+<link rel="stylesheet" href="style.css?v=202608210658">
 </head><body>
 
 <header>
@@ -144,10 +144,8 @@
 <div><label>2便廃棄（21時）</label><input id=h_ha2 type=number></div>
 <div><label>3便廃棄（5時）</label><input id=h_ha3 type=number></div></div>
 <p class=note>便別納品はその日の発注データから自動入力されます。ストコン画面の廃棄は1便＝14時、2便＝21時、3便＝翌5時の位置に表示されます。</p>
-<div class="fg g2">
-<div><label>欠品率%</label><input id=h_kk type=number step=0.1></div>
-<div><label>客数</label><input id=h_k type=number></div></div>
-<div class="fg"><div><label>メモ</label><input id=h_m></div></div>
+<div class="fg"><div><label>メモ（施策・イベント・気づいたこと）</label><input id=h_m placeholder="例：CM最終日 / 近隣で工事 / 台風で客数減"></div></div>
+<p class=note id=h_lastyear></p>
 <div class=btns style="margin-top:10px"><button onclick="saveHist()">記録</button>
 <button class=gh onclick="document.getElementById('dHist').close()">閉じる</button></div></dialog>
 
@@ -186,6 +184,12 @@
 <button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
 </div>
 <p class=note>曜日係数の学習・週平均の提案に使われます。普段は見なくて大丈夫です。</p>
+<h2 style="margin-top:14px">メモ一覧（施策・イベントの記録）</h2>
+<div class=btns>
+<button class="gh sm" id=memoWeek aria-pressed=false onclick="setMemoView('week')">週ごと</button>
+<button class="gh sm" id=memoMonth aria-pressed=true onclick="setMemoView('month')">月ごと</button>
+</div>
+<div id=memolist class=row-grid></div>
 <h2 style="margin-top:14px">書き出し・AI連携・カメラ取込</h2>
 <div class=btns>
 <button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
@@ -210,6 +214,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=202608210650"></script>
-<script src="app.js?v=202608210650"></script>
+<script src="data.js?v=202608210658"></script>
+<script src="app.js?v=202608210658"></script>
 </body></html>
