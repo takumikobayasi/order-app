@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=202608211954">
+<link rel="stylesheet" href="style.css?v=202608212018">
 </head><body>
 
 <header>
@@ -144,10 +144,10 @@
 <div><label>2便販売</label><input id=h_s2 type=number></div>
 <div><label>3便販売</label><input id=h_s3 type=number></div></div>
 <div class="fg g3">
-<div><label>1便廃棄（14時）</label><input id=h_ha1 type=number></div>
-<div><label>2便廃棄（21時）</label><input id=h_ha2 type=number></div>
-<div><label>3便廃棄（5時）</label><input id=h_ha3 type=number></div></div>
-<p class=note>便別納品はその日の発注データから自動入力されます。ストコン画面の廃棄は1便＝14時、2便＝21時、3便＝翌5時の位置に表示されます。</p>
+<div><label>1便廃棄（5時）</label><input id=h_ha1 type=number></div>
+<div><label>2便廃棄（14時）</label><input id=h_ha2 type=number></div>
+<div><label>3便廃棄（21時）</label><input id=h_ha3 type=number></div></div>
+<p class=note>便別納品はその日の発注データから自動入力されます。ストコン画面の廃棄は1便＝5時、2便＝14時、3便＝21時の位置に表示されます。</p>
 <div class="fg"><div><label>メモ（施策・イベント・気づいたこと）</label><input id=h_m placeholder="例：CM最終日 / 近隣で工事 / 台風で客数減"></div></div>
 <p class=note id=h_lastyear></p>
 <div class=btns style="margin-top:10px"><button onclick="saveHist()">記録</button>
@@ -224,6 +224,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=202608211954"></script>
-<script src="app.js?v=202608211954"></script>
+<script src="data.js?v=202608212018"></script>
+<script src="app.js?v=202608212018"></script>
 </body></html>
