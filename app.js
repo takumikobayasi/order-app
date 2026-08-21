@@ -506,7 +506,9 @@ function renderItems(){
       };
       inp.onchange=e=>{const x=e.target.value===''?null:Number(e.target.value);
         setV(r.id,MODE,i,x);paintTotals();autosave()};
-      td.appendChild(inp);tr.appendChild(td)}
+      // 狭い画面では見出し行を隠すため、各入力の上に便名を出す
+      const bl=document.createElement('span');bl.className='bl';bl.textContent=(i+1)+'便';
+      td.append(bl,inp);tr.appendChild(td)}
     const t6=document.createElement('td');t6.className='tot';
     t6.textContent=v.reduce((a,c)=>a+(c||0),0)||'';tr.appendChild(t6);
     if(showOther){const t7=document.createElement('td');t7.className='col-other';t7.style.fontSize='11px';t7.style.color='var(--muted)';
