@@ -559,16 +559,32 @@ function delItem(){if(EDIT==null){$('dItem').close();return}
   $('dItem').close();renderTabs();paintTotals();autosave()}
 
 /* ---------- 履歴・目標 ---------- */
-function openHist(){const d=($('dt').value||'').trim();
-  const r=G().hist.find(x=>x.d===d)||{};
+function openHist(){
+  const t=new Date(Date.now()-86400000); // 前日から開始
+  loadHistDate((t.getMonth()+1)+'/'+t.getDate());
+  $('dHist').showModal()}
+function loadHistDate(d){
+  const g=G(),r=g.hist.find(x=>x.d===d)||{};
   const set=(id,v)=>$(id).value=(v===null||v===undefined)?'':v;
   set('h_d',d);set('h_w',r.w);set('h_ai',r.ai);set('h_n',r.n);set('h_s',r.s);set('h_ha',r.ha);
-  set('h_kk',r.kk);set('h_k',r.k);set('h_m',r.m);set('h_am',r.am);
-  const nb=r.nb||[null,null,null],sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
+  set('h_kk',r.kk);set('h_k',r.k);set('h_m',r.m);
+  const sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
+  // 便別納品：記録済みならそれを、なければその日の発注データから自動入力
+  let nb=r.nb;
+  if(!nb&&g.cur.dt===d){const s=sums('o');if(s.T)nb=s.b}
+  nb=nb||[null,null,null];
   set('h_n1',nb[0]);set('h_n2',nb[1]);set('h_n3',nb[2]);
+  if(!r.n&&nb.some(x=>x!=null))set('h_n',nb.reduce((a,x)=>a+(x||0),0));
   set('h_s1',sb[0]);set('h_s2',sb[1]);set('h_s3',sb[2]);
   set('h_ha1',hab[0]);set('h_ha2',hab[1]);set('h_ha3',hab[2]);
-  $('dHist').showModal()}
+}
+function shiftHistDate(dir){
+  const m=($('h_d').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
+  const now=new Date();
+  let base=m?new Date(now.getFullYear(),+m[1]-1,+m[2]):new Date(Date.now()-86400000);
+  base.setDate(base.getDate()+dir);
+  loadHistDate((base.getMonth()+1)+'/'+base.getDate());
+}
 function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)};
   const d=$('h_d').value.trim()||$('dt').value.trim();if(!d){alert('日付を入れてください');return}
   const nb=[n('h_n1'),n('h_n2'),n('h_n3')],sb=[n('h_s1'),n('h_s2'),n('h_s3')],hab=[n('h_ha1'),n('h_ha2'),n('h_ha3')];
@@ -577,13 +593,12 @@ function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)}
   const pick=(v,o)=>v===null||v===''||v===undefined?(o??null):v;
   const rec={d,w:pick($('h_w').value.trim(),old.w),ai:pick(n('h_ai'),old.ai),n:pick(n('h_n'),old.n),
     s:pick(n('h_s'),old.s),ha:pick(n('h_ha'),old.ha),kk:pick(n('h_kk'),old.kk),k:pick(n('h_k'),old.k),
-    m:pick($('h_m').value.trim(),old.m),am:pick(n('h_am'),old.am),
+    m:pick($('h_m').value.trim(),old.m),am:old.am??null,
     nb:nb.some(x=>x!==null)?nb:(old.nb||null),sb:sb.some(x=>x!==null)?sb:(old.sb||null),
     hab:hab.some(x=>x!==null)?hab:(old.hab||null)};
   if(rec.ha==null&&rec.hab)rec.ha=rec.hab.reduce((a,x)=>a+(x||0),0);
-  if(rec.s==null&&rec.am!=null){
-    const prev=G().hist.filter(x=>x.d!==d&&x.am!=null).slice(-1)[0];
-    if(prev&&rec.n!=null)rec.s=Math.max(0,prev.am+rec.n-rec.am-(rec.ha||0));}
+  if(rec.s==null&&rec.sb)rec.s=rec.sb.reduce((a,x)=>a+(x||0),0)||null;
+  if(rec.n==null&&rec.nb)rec.n=rec.nb.reduce((a,x)=>a+(x||0),0)||null;
   if(i>=0)G().hist[i]=rec;else G().hist.push(rec);
   G().hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
   $('dHist').close();renderHist();renderSetup();autosave();flash('記録しました')}
