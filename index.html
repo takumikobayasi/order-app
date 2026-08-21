@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=202608212135">
+<link rel="stylesheet" href="style.css?v=202608212153">
 </head><body>
 
 <header>
@@ -182,7 +182,7 @@
 <h2 style="margin-top:14px">便と廃棄の時間（ジャンル別）</h2>
 <div class="fg"><div><label>ジャンル</label><select id=bm_gen onchange="bmSwitchGen()"></select></div></div>
 <div id=bmwrap style="overflow-x:auto"><table id=bmtbl><thead id=bmth></thead><tbody id=bmtb></tbody></table></div>
-<p class=note id=bmhelp>Day0＝発注日。納品と廃棄の日を選び、時刻にチェックを入れてください。廃棄が複数回に分かれる便は複数チェックできます。使わない便は空のままで大丈夫です。</p>
+<p class=note id=bmhelp>納品は発注日から、廃棄は納品日から数えます。「納品日から2日もつ、1日後の2時に廃棄」なら、納品＝翌日／廃棄＝1日後の2時です。廃棄が複数回に分かれる便は時刻を複数チェックできます。使わない便は空のままで大丈夫です。</p>
 <div id=bmsum class=note></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" id=bmEditBtn onclick="bmEdit(true)">編集する</button>
@@ -232,6 +232,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=202608212135"></script>
-<script src="app.js?v=202608212135"></script>
+<script src="data.js?v=202608212153"></script>
+<script src="app.js?v=202608212153"></script>
 </body></html>
