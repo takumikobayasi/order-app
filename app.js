@@ -100,6 +100,12 @@ async function syncCloud(){
   save();
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
+  // 空データでクラウドを上書きしてしまう事故を防ぐ
+  const totalItems=Object.values(DB.g||{}).reduce((a,g)=>a+((g.items||[]).length),0);
+  const totalHist=Object.values(DB.g||{}).reduce((a,g)=>a+((g.hist||[]).length),0);
+  if(totalItems===0&&totalHist===0){
+    if(!confirm('この端末のデータが空です。このまま同期するとクラウドのデータが空で上書きされます。\n\n（データを取り戻したい場合は「キャンセル」→設定→「クラウドから読み込む（復元）」を押してください）\n\n本当に空のまま同期しますか？'))return;
+  }
   $('st').textContent='同期中...';
   try{
     DB.pendingSync=false;DB.ts=Date.now();DB.syncedTs=DB.ts;
@@ -124,7 +130,10 @@ function cloudLoadSilent(){
   window[cb]=function(data){
     delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);
     if(!data||!data.g)return;
-    if(DB.pendingSync)return; // 未同期の変更が端末にある場合は上書きしない
+    const cloudItems=Object.values(data.g).reduce((a,g)=>a+((g.items||[]).length),0);
+    const localItems=Object.values(DB.g||{}).reduce((a,g)=>a+((g.items||[]).length),0);
+    if(cloudItems===0&&localItems>0)return; // 空データで端末を上書きしない
+    if(DB.pendingSync&&localItems>0)return; // 未同期の変更が端末にある場合は上書きしない
     const localSynced=DB.syncedTs||0;
     if((data.ts||0)!==localSynced){
       const keepUrl=localStorage.getItem(GAS_KEY);
