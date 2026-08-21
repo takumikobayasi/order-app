@@ -653,28 +653,47 @@ function renderMemos(){
   if(!keys.length){const p=document.createElement('div');p.className='note';
     p.textContent='まだメモがありません。実績記録のメモ欄に施策やイベントを書くとここにまとまります。';
     el.appendChild(p);return}
-  keys.reverse().forEach(k=>{
+  // 同じ時期の年違いが隣り合うよう、月日順→年順に並べる
+  const sortKey=k=>{const y=(k.match(/^(\d{4})/)||[])[1]||'0';
+    const md=k.match(/(\d{1,2})月/)||k.match(/(\d{1,2})\/(\d{1,2})/);
+    const mo=md?+md[1]:0, da=md&&md[2]?+md[2]:0;
+    return mo*10000+da*100+(9999-+y)};
+  keys.sort((a,b)=>sortKey(b)-sortKey(a)).forEach(k=>{
     const w=document.createElement('div');w.className='row';
     const a=document.createElement('div');a.className='k';a.textContent=k;
     const b=document.createElement('div');b.className='v';b.textContent=groups[k].join(' ／ ');
     w.append(a,b);el.appendChild(w)});
 }
-/* 去年の同時期（前後3日）に残したメモを探して表示する */
+/* 指定した年・期間(週/月)のメモをまとめて返す */
+function memosIn(year,mo,da,span){
+  const Y=new Date().getFullYear(),out=[];
+  let from,to;
+  if(span==='week'){
+    const b=new Date(Y,mo-1,da);b.setDate(b.getDate()-((b.getDay()+6)%7));
+    from=new Date(b);to=new Date(b);to.setDate(to.getDate()+6);
+  }
+  (G().hist||[]).forEach(h=>{
+    if(!h.m)return;
+    if((h.y||Y)!==year)return;
+    const m=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
+    if(span==='month'){ if(+m[1]!==mo)return }
+    else{ const hd=new Date(Y,+m[1]-1,+m[2]); if(hd<from||hd>to)return }
+    out.push(`${h.d} ${h.m}`);
+  });
+  return out}
+/* 去年の同じ週・同じ月のメモをまとめて表示する */
 function showLastYearNote(d){
   const el=$('h_lastyear');if(!el)return;el.textContent='';el.className='note';
   const m=(d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
   const thisYear=new Date().getFullYear();
-  const target=new Date(thisYear,+m[1]-1,+m[2]);
-  const hits=[];
-  (G().hist||[]).forEach(h=>{
-    if(!h.m)return;
-    const hy=h.y||thisYear; if(hy>=thisYear)return; // 今年の分は対象外
-    const hm=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!hm)return;
-    const hd=new Date(thisYear,+hm[1]-1,+hm[2]);
-    if(Math.abs((hd-target)/86400000)<=3)hits.push(`${hy}年 ${h.d}: ${h.m}`);
-  });
-  if(hits.length){el.className='note ok';
-    el.textContent='📌 去年の同時期のメモ … '+hits.slice(0,3).join(' ／ ')}
+  const ly=thisYear-1, mo=+m[1], da=+m[2];
+  const wk=memosIn(ly,mo,da,'week'), mn=memosIn(ly,mo,da,'month');
+  const lines=[];
+  if(wk.length)lines.push(`【去年の同じ週】${wk.join(' ／ ')}`);
+  const only=mn.filter(x=>!wk.includes(x));
+  if(only.length)lines.push(`【去年の同じ月・その他】${only.join(' ／ ')}`);
+  if(lines.length){el.className='note ok';el.textContent='📌 '+lines.join('　')}
+  else{el.className='note';el.textContent=`去年（${ly}年）の${mo}月にはメモがありません`}
 }
 function shiftHistDate(dir){
   const m=($('h_d').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
