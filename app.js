@@ -447,6 +447,7 @@ function alloc(){
   if(!tq&&!ta){
     const D=demand();
     if(!D){alert('目標個数か金額を入れてください（天気・曜日から提案するには設定で週平均販売数を登録してください）');return}
+    if(!confirm(`目標が未入力です。天気・曜日からの提案数(${D.q}個)を使って全商品の発注数を配分しますか？`))return;
     tq=D.q;usedDemand=true;
   }
   let target=tq||Math.round(ta/(live.reduce((a,r)=>a+r.price*r.day,0)/live.reduce((a,r)=>a+r.day,0)));
