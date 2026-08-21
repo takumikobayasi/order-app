@@ -110,6 +110,7 @@
 <div><label>本部目安</label><input id=f_my type=number></div>
 <div><label>印</label><input id=f_tag placeholder="新/取消"></div>
 </div>
+<div class="fg"><div><label>廃棄区分（D0〜D6）</label><select id=f_dclass><option value="">未設定</option></select></div></div>
 <div class="fg g3">
 <div><label>値入率(%)</label><input id=f_margin type=number step=0.1 placeholder="例 40.4"></div>
 </div>
@@ -224,11 +225,13 @@
 
 <dialog id=dMaster>
 <h2>廃棄期限マスター</h2>
-<p class=note>ジャンルごとに、便ごとの廃棄時刻を登録します。登録した内容は発注画面の便表示と提案数の計算に使います。</p>
-<h3>ジャンル別の廃棄時刻</h3>
+<p class=note>ジャンルごとにD区分を選び、Dごとの便別廃棄時刻を登録します。商品登録時にD区分を選ぶと、その商品の便表示に反映されます。</p>
+<h3>使用するD区分</h3>
 <div class="fg"><div><label>ジャンル</label><select id=bm_gen onchange="bmSwitchGen()"></select></div></div>
+<div id=bmdlist class="btns"></div>
+<h3>D区分ごとの廃棄時刻</h3>
 <div id=bmwrap style="overflow-x:auto"><table id=bmtbl><thead id=bmth></thead><tbody id=bmtb></tbody></table></div>
-<p class=note id=bmhelp>「おむすび1便は14時廃棄」のように、便ごとの廃棄時刻をチェックしてください。複数回ある場合は複数の時刻を選べます。使わない便は空のままで大丈夫です。</p>
+<p class=note id=bmhelp>例：「おむすびのD2・1便は14時廃棄」。D0〜D6から使う区分をチェックし、各Dの1〜3便の廃棄時刻を選んでください。</p>
 <div id=bmsum class=note></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" id=bmEditBtn onclick="bmEdit(true)">編集する</button>

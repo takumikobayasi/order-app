@@ -533,6 +533,7 @@ function renderItems(){
     n1.appendChild(nameSp);
     const wf=wasteFactor(r);
     const infoParts=['¥'+(r.price||0)+' 日販'+(r.day||0)+((r.unit||1)>1?' 2個単位':'')];
+    if(itemDClass(r)!=null)infoParts.push('廃棄D'+itemDClass(r));
     if(r.memo)infoParts.push(r.memo);
     if(r.my)infoParts.push('本部目安'+r.my+'個');
     if(wf<1)infoParts.push(`廃棄実績${Math.round((1-wf)*100)}%減`);
@@ -593,7 +594,7 @@ function renderItems(){
         t6.textContent=nv.reduce((a,c)=>a+(c||0),0)||'';
         refreshSum();renderSetup();autosave()};
       // 狭い画面では見出し行を隠すため、各入力の上に便名を出す
-      const bl=document.createElement('span');bl.className='bl';bl.textContent=binLabel(g,i,false);
+      const bl=document.createElement('span');bl.className='bl';bl.textContent=binLabel(g,i,false,r);
       td.append(bl,inp);tr.appendChild(td)});
     t6.textContent=v.reduce((a,c)=>a+(c||0),0)||'';tr.appendChild(t6);
     if(showOther){const t7=document.createElement('td');t7.className='col-other';t7.style.fontSize='11px';t7.style.color='var(--muted)';
@@ -754,17 +755,26 @@ function setAll(id,v){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[null
   c[id].o=v.slice()}
 
 /* ---------- 商品編集 ---------- */
+function renderDClassOptions(){
+  const sel=$('f_dclass');if(!sel)return;
+  sel.textContent='';
+  const blank=document.createElement('option');blank.value='';blank.textContent='未設定';sel.appendChild(blank);
+  for(let d=0;d<=6;d++){const o=document.createElement('option');o.value=d;o.textContent='D'+d;sel.appendChild(o)}
+}
 function editItem(ix){EDIT=ix;const r=ix==null?{}:G().items[ix];
+  renderDClassOptions();
   $('itTitle').textContent=ix==null?'商品を追加':'商品を編集';
   $('f_name').value=r.name||'';$('f_price').value=r.price??'';$('f_day').value=r.day??'';
   $('f_unit').value=String(r.unit||1);$('f_grade').value=r.grade||'○';
   $('f_my').value=r.my??'';$('f_tag').value=r.tag||'';$('f_memo').value=r.memo||'';
   $('f_margin').value=r.margin??'';
+  $('f_dclass').value=r.dclass==null?'':String(r.dclass);
   $('dItem').showModal()}
 function saveItem(){const n=$('f_name').value.trim();if(!n){alert('商品名を入れてください');return}
   const o={name:n,price:Number($('f_price').value)||0,day:Number($('f_day').value)||0,
     unit:Number($('f_unit').value)||1,grade:$('f_grade').value,my:Number($('f_my').value)||0,
     tag:$('f_tag').value.trim(),memo:$('f_memo').value.trim(),
+    dclass:$('f_dclass').value===''?undefined:Number($('f_dclass').value),
     margin:$('f_margin').value===''?undefined:Number($('f_margin').value)};
   if(EDIT==null){o.id='i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);G().items.push(o)}
   else G().items[EDIT]=Object.assign(G().items[EDIT],o);
@@ -928,6 +938,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
 /* ---------- 便と廃棄の時間マスタ（ジャンルごとに固定） ---------- */
 /* 便ごとの納品時刻・廃棄時刻を保持する。d は旧版データ互換用に残す */
 const BINT=[2,5,11,14,18,21,24];
+const DCLS=[0,1,2,3,4,5,6];
 /* d/t の旧版データも読めるように保持する */
 function binmx(g){
   g=g||G();
@@ -936,6 +947,19 @@ function binmx(g){
     if(!Array.isArray(g.binmx[k]))g.binmx[k]=[];
     for(let i=0;i<3;i++)if(!g.binmx[k][i])g.binmx[k][i]={d:null,t:[]};
     g.binmx[k].length=3});
+  if(!Array.isArray(g.binmx.dEnabled))g.binmx.dEnabled=[];
+  if(!Array.isArray(g.binmx.wasteD))g.binmx.wasteD=[];
+  DCLS.forEach(d=>{
+    if(!Array.isArray(g.binmx.wasteD[d]))g.binmx.wasteD[d]=[];
+    for(let i=0;i<3;i++)if(!g.binmx.wasteD[d][i])g.binmx.wasteD[d][i]={t:[]};
+    g.binmx.wasteD[d].length=3;
+  });
+  // 旧版のジャンル共通設定はD0として引き継ぐ
+  if(!g.binmx.dMigrated&&g.binmx.waste.some(x=>x.t&&x.t.length)){
+    g.binmx.waste.forEach((x,i)=>g.binmx.wasteD[0][i].t=x.t.slice());
+    if(!g.binmx.dEnabled.includes(0))g.binmx.dEnabled.push(0);
+    g.binmx.dMigrated=true;
+  }
   // 旧版データに残る日数情報は互換用に補正する
   if(!g.binmx.rel){
     for(let i=0;i<3;i++){const dv=g.binmx.deliv[i],wt=g.binmx.waste[i];
@@ -946,12 +970,12 @@ function bmGenKey(){const el=$('bm_gen');return (el&&el.value)||DB.active}
 function bmGroup(){return DB.g[bmGenKey()]||G()}
 function setBinDay(kind,i,v){const m=binmx(bmGroup());
   m[kind][i].d=v===''?null:Number(v);renderBinMx();autosave()}
-function toggleBinT(kind,i,t,on){const m=binmx(bmGroup()),a=m[kind][i];
-  a.t=(a.t||[]).filter(x=>x!==t);if(on)a.t.push(t);
-  a.t.sort((x,y)=>x-y);
-  // 廃棄期限は日数ではなく、便ごとの時刻だけをマスター登録する。
-  a.d=a.t.length?0:null;
+function setDEnabled(d,on){const m=binmx(bmGroup());
+  m.dEnabled=m.dEnabled.filter(x=>x!==d);if(on)m.dEnabled.push(d);m.dEnabled.sort((a,b)=>a-b);
   BM_EDIT=true;renderBinMx();autosave()}
+function toggleDWaste(d,i,t,on){const m=binmx(bmGroup()),a=m.wasteD[d][i];
+  a.t=(a.t||[]).filter(x=>x!==t);if(on)a.t.push(t);
+  a.t.sort((x,y)=>x-y);BM_EDIT=true;renderBinMx();autosave()}
 /* 納品〜廃棄の時間差。日と時刻が両方そろっている便だけ計算できる */
 function binSpan(g,i){
   const m=binmx(g),dv=m.deliv[i],wt=m.waste[i];
@@ -959,13 +983,10 @@ function binSpan(g,i){
   const from=dv.d*24+Math.min(...dv.t), to=(dv.d+wt.d)*24+Math.max(...wt.t);
   return to>from?to-from:null}
 function binSummaryLines(g){
-  const m=binmx(g),out=[];
-  for(let i=0;i<3;i++){
-    const dv=m.deliv[i],wt=m.waste[i];
-    if(!wt.t.length)continue;
-    const times=a=>a&&a.length?a.join('時・')+'時':'未設定';
-    out.push(`${i+1}便：廃棄 ${times(wt.t)}`);
-  }
+  const m=binmx(g),out=[];const times=a=>a&&a.length?a.join('時・')+'時':'未設定';
+  m.dEnabled.forEach(d=>{for(let i=0;i<3;i++){
+    const wt=m.wasteD[d][i];if(wt.t.length)out.push(`D${d}・${i+1}便：廃棄 ${times(wt.t)}`);
+  }});
   return out}
 /* マスタに登録のある便だけを使う。未登録のジャンルは従来どおり1〜3便すべて */
 function binsUsed(g){
@@ -973,17 +994,18 @@ function binsUsed(g){
   if(!g.binmx)return [0,1,2];
   const m=binmx(g),out=[];
   for(let i=0;i<3;i++){
-    const dv=m.deliv[i],wt=m.waste[i];
-    if(wt.t.length)out.push(i)}
+    if(m.dEnabled.some(d=>m.wasteD[d][i].t.length))out.push(i)}
   return out.length?out:[0,1,2]}
 /* 便の見出しに廃棄時刻を添える（例「2便 14時廃棄」） */
-function binLabel(g,i,short){
+function itemDClass(r){const d=Number(r&&r.dclass);return Number.isInteger(d)&&d>=0&&d<=6?d:null}
+function binLabel(g,i,short,r){
   const base=(i+1)+'便';
   g=g||G();
   if(!g.binmx)return base;
-  const t=binmx(g).waste[i].t;
+  const m=binmx(g),d=itemDClass(r);
+  const t=d==null?m.dEnabled.flatMap(x=>m.wasteD[x][i].t):m.wasteD[d][i].t;
   if(!t||!t.length)return base;
-  return base+(short?' ':'\n')+t.join('・')+'時廃棄'}
+  return base+(short?' ':'\n')+t.filter((x,j,a)=>a.indexOf(x)===j).join('・')+'時廃棄'}
 let BM_EDIT=false;
 function bmEdit(on){BM_EDIT=on;renderBinMx()}
 function bmSwitchGen(){BM_EDIT=false;renderBinMx()}
@@ -993,6 +1015,10 @@ function renderBinMx(){
     GEN.forEach(([k,nm])=>{const o=document.createElement('option');o.value=k;o.textContent=nm;sel.appendChild(o)});
     sel.value=DB.active}
   const g=bmGroup(),m=binmx(g);
+  const dl=$('bmdlist');dl.textContent='';
+  DCLS.forEach(d=>{const lab=document.createElement('label');lab.className='gh sm';lab.style.display='inline-flex';lab.style.gap='4px';
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=m.dEnabled.includes(d);cb.style.width='18px';
+    cb.onchange=e=>setDEnabled(d,e.target.checked);lab.append(cb,document.createTextNode('D'+d));dl.appendChild(lab)});
   const th=$('bmth'),done=binSummaryLines(g).length>0;
   // 登録済みのジャンルは、登録した便だけを一覧で見せる（編集ボタンで表に戻す）
   $('bmwrap').style.display=(done&&!BM_EDIT)?'none':'';
@@ -1006,10 +1032,10 @@ function renderBinMx(){
   BINT.forEach(t=>{const e=document.createElement('th');e.style.textAlign='center';e.textContent=t+'時';hr.appendChild(e)});
   th.appendChild(hr);
   const tb=$('bmtb');tb.textContent='';
-  [['waste','廃棄時刻']].forEach(([kind,label])=>{
+  m.dEnabled.forEach(d=>{
     const hd=document.createElement('tr');
     const hc=document.createElement('td');hc.className='l';hc.colSpan=2+BINT.length;
-    hc.style.fontWeight='700';hc.style.background='var(--bg)';hc.textContent=label;
+    hc.style.fontWeight='700';hc.style.background='var(--bg)';hc.textContent='D'+d+' 廃棄時刻';
     hd.appendChild(hc);tb.appendChild(hd);
     for(let i=0;i<3;i++){
       const tr=document.createElement('tr');
@@ -1019,8 +1045,8 @@ function renderBinMx(){
         const c=document.createElement('td');c.style.textAlign='center';
         const cb=document.createElement('input');cb.type='checkbox';
         cb.style.width='20px';cb.style.height='20px';cb.style.padding='0';
-        cb.checked=(m[kind][i].t||[]).includes(t);
-        cb.onchange=e=>toggleBinT(kind,i,t,e.target.checked);
+        cb.checked=m.wasteD[d][i].t.includes(t);
+        cb.onchange=e=>toggleDWaste(d,i,t,e.target.checked);
         c.appendChild(cb);tr.appendChild(c)});
       tb.appendChild(tr)}
   });
