@@ -12,6 +12,18 @@ let DB=null, MODE='o', SORT=false, EDIT=null, LOCK_OVERRIDE=false;
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
 function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',g}}
+/* GENに定義された全カテゴリがDBに存在するよう補完する。
+   クラウド読込や取り込みで古い構成のデータが入っても、新カテゴリが消えないようにする */
+function ensureCategories(){
+  if(!DB||!DB.g)return;
+  GEN.forEach(([k,n,i])=>{
+    if(!DB.g[k]){
+      DB.g[k]=blank(n,i);
+      if(typeof SEED!=='undefined'&&SEED[k])Object.assign(DB.g[k],SEED[k]);
+    }else{ DB.g[k].name=n; DB.g[k].icon=i; }
+  });
+  if(!DB.g[DB.active])DB.active=GEN[0][0];
+}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
 function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
@@ -137,7 +149,7 @@ function cloudLoadSilent(){
     const localSynced=DB.syncedTs||0;
     if((data.ts||0)!==localSynced){
       const keepUrl=localStorage.getItem(GAS_KEY);
-      DB=data;DB.syncedTs=data.ts||0;save();
+      DB=data;DB.syncedTs=data.ts||0;ensureCategories();save();
       if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();flash('☁️ 最新データを反映');
     }
@@ -174,6 +186,7 @@ function cloudLoad(){
     if(data && data.g){
       const keepUrl=localStorage.getItem(GAS_KEY);
       DB = data;
+      ensureCategories();
       DB.syncedTs = data.ts||0;
       DB.pendingSync = false;
       save();
@@ -971,7 +984,7 @@ function copyOut(){const t=$('out');if(!t.value){outCompact()}t.select();
   else{document.execCommand('copy');done()}}
 function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
   if(!m){alert('バックアップの文字列が見つかりません');return}
-  try{const d=JSON.parse(b64d(m[1]));if(!d.g)throw 0;DB=d;save();$('dImp').close();$('impbox').value='';
+  try{const d=JSON.parse(b64d(m[1]));if(!d.g)throw 0;DB=d;ensureCategories();save();$('dImp').close();$('impbox').value='';
     renderAll();flash('読み込みました')}catch(e){alert('読み込めませんでした')}}
 
 /* ---------- マウスドラッグで横スクロール（DeX等タッチ非対応環境向け） ---------- */
@@ -1015,6 +1028,6 @@ if(!DB.g)DB=fresh();
   const hist=Object.values(DB.g||{}).reduce((a,g)=>a+((g.hist||[]).length),0);
   if(items===0&&hist===0)DB=fresh();
 })();
-GEN.forEach(([k,n,i])=>{if(!DB.g[k])DB.g[k]=blank(n,i)});
+ensureCategories();
 renderAll();save();
 cloudLoadSilent();
