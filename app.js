@@ -165,6 +165,12 @@ function cloudLoad(){
     if(done)return;done=true;clearTimeout(timer);
     delete window[cbName];
     if(script.parentNode) script.parentNode.removeChild(script);
+    const cloudN=data&&data.g?Object.values(data.g).reduce((a,g)=>a+((g.items||[]).length),0):0;
+    if(data && data.g && cloudN===0){
+      alert('クラウドのデータが空でした（商品0品）。\n復元できるデータがないため、この端末のデータはそのままにします。');
+      flash('読込(空)');
+      return;
+    }
     if(data && data.g){
       const keepUrl=localStorage.getItem(GAS_KEY);
       DB = data;
@@ -853,6 +859,13 @@ document.querySelectorAll('.hscroll').forEach(enableDragScroll);
 $('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;autosave()});
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
+/* 保存データが空(商品0件かつ履歴0件)なら初期データから復旧する。
+   キャッシュ削除などでデータが失われても商品マスタが戻るようにする */
+(function reseedIfEmpty(){
+  const items=Object.values(DB.g||{}).reduce((a,g)=>a+((g.items||[]).length),0);
+  const hist=Object.values(DB.g||{}).reduce((a,g)=>a+((g.hist||[]).length),0);
+  if(items===0&&hist===0)DB=fresh();
+})();
 GEN.forEach(([k,n,i])=>{if(!DB.g[k])DB.g[k]=blank(n,i)});
 renderAll();save();
 cloudLoadSilent();
