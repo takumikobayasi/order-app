@@ -372,7 +372,13 @@ function demand(){
   return{q:Math.round(b*i.f*up*wf),
     src:`週平均${b}個 × ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')+(wf!==1?` × 天気${wf.toFixed(2)}`:'')}}
 function applyDow(){const i=dowInfo();if(!i)return null;
-  $('r1').value=i.r[0];$('r2').value=i.r[1];$('r3').value=i.r[2];return i}
+  $('r1').value=i.r[0];$('r2').value=i.r[1];$('r3').value=i.r[2];
+  // 使わない便は配分欄も隠し、その分を0にして他の便へ回す
+  const B=binsUsed();
+  [1,2,3].forEach(n=>{const use=B.includes(n-1);
+    $('rw'+n).style.display=use?'':'none';
+    if(!use)$('r'+n).value=0});
+  return i}
 function tgtKey(){const m=($('dt').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);return m?(+m[1]+'/'+ +m[2]):null}
 
 /* ---------- 集計・AI採用率 ---------- */
@@ -486,7 +492,9 @@ function renderItems(){
   const H=$('ith');H.textContent='';
   const hr=document.createElement('tr');
   const showOther=!SORT;
-  const cols=SORT?['','商品',' ','1便','2便','3便','計']:['商品','適','1便','2便','3便','計',...(showOther?['他']:[])];
+  const BINS=binsUsed(g);                       // マスタに登録のある便だけ表示する
+  const bcols=BINS.map(i=>binLabel(g,i,true));
+  const cols=SORT?['','商品',' ',...bcols,'計']:['商品','適',...bcols,'計',...(showOther?['他']:[])];
   cols.forEach((c,ix)=>{const th=document.createElement('th');th.textContent=c;
     if((SORT&&ix===1)||(!SORT&&ix===0))th.className='l';
     if(!SORT&&showOther&&ix===cols.length-1)th.className='col-other';
@@ -542,9 +550,9 @@ function renderItems(){
     const v=vv(r.id,MODE);
     const LK=MODE==='o'?lockState():{c0:false,c12:false};
     const t6=document.createElement('td');t6.className='tot';
-    for(let i=0;i<3;i++){const td=document.createElement('td');
+    BINS.forEach((i,ci)=>{const td=document.createElement('td');
       const inp=document.createElement('input');inp.type='number';inp.inputMode='numeric';
-      inp.dataset.row=ix;inp.dataset.col=i;
+      inp.dataset.row=ix;inp.dataset.col=ci;
       inp.value=v[i]===null?'':v[i];
       if((r.unit||1)>1&&v[i]!=null&&v[i]%r.unit!==0){
         inp.classList.add('bad-unit');inp.title=`${r.unit}個単位です`}
@@ -553,15 +561,16 @@ function renderItems(){
       inp.onfocus=e=>e.target.select();
       inp.onkeydown=e=>{
         const rIx=+e.target.dataset.row, cIx=+e.target.dataset.col;
+        const last=BINS.length-1;
         if(e.key==='Enter'||e.key==='ArrowDown'){
           e.preventDefault();
-          let nxt=cIx<2?document.querySelector(`input[data-row="${rIx}"][data-col="${cIx+1}"]`)
-                       :document.querySelector(`input[data-row="${rIx+1}"][data-col="0"]`);
+          let nxt=cIx<last?document.querySelector(`input[data-row="${rIx}"][data-col="${cIx+1}"]`)
+                          :document.querySelector(`input[data-row="${rIx+1}"][data-col="0"]`);
           if(nxt)nxt.focus();
         }else if(e.key==='ArrowUp'){
           e.preventDefault();
           let prev=cIx>0?document.querySelector(`input[data-row="${rIx}"][data-col="${cIx-1}"]`)
-                        :document.querySelector(`input[data-row="${rIx-1}"][data-col="2"]`);
+                        :document.querySelector(`input[data-row="${rIx-1}"][data-col="${last}"]`);
           if(prev)prev.focus();
         }
       };
@@ -576,24 +585,26 @@ function renderItems(){
         t6.textContent=nv.reduce((a,c)=>a+(c||0),0)||'';
         refreshSum();renderSetup();autosave()};
       // 狭い画面では見出し行を隠すため、各入力の上に便名を出す
-      const bl=document.createElement('span');bl.className='bl';bl.textContent=(i+1)+'便';
-      td.append(bl,inp);tr.appendChild(td)}
+      const bl=document.createElement('span');bl.className='bl';bl.textContent=binLabel(g,i,false);
+      td.append(bl,inp);tr.appendChild(td)});
     t6.textContent=v.reduce((a,c)=>a+(c||0),0)||'';tr.appendChild(t6);
     if(showOther){const t7=document.createElement('td');t7.className='col-other';t7.style.fontSize='11px';t7.style.color='var(--muted)';
       const oth=MODE==='o'?['i']:['o'];
       t7.textContent=oth.map(m=>{const x=vv(r.id,m).reduce((a,c)=>a+(c||0),0);return x||'-'}).join('/');
       tr.appendChild(t7)}
     B.appendChild(tr)});
-  addSum()}
+  B.className='bins'+BINS.length;
+  addSum(BINS)}
 function refreshSum(){
   const old=$('itb').querySelector('tr.sum');
   if(old)old.remove();
-  addSum();}
-function addSum(){const s=sums(MODE),tr=document.createElement('tr');tr.className='sum';
+  addSum(binsUsed());}
+function addSum(BINS){const s=sums(MODE),tr=document.createElement('tr');tr.className='sum';
+  BINS=BINS||[0,1,2];
   const c=(t,cl)=>{const td=document.createElement('td');td.textContent=t;if(cl)td.className=cl;tr.appendChild(td)};
   const showOther=!SORT;
   if(SORT)c('');c('合計 '+s.n+'品','l');c('');
-  c(s.b[0]);c(s.b[1]);c(s.b[2]);c(s.T);
+  BINS.forEach(i=>c(s.b[i]));c(s.T);
   if(showOther)c(s.amt.toLocaleString(),'col-other');
   $('itb').appendChild(tr)}
 function paintTotals(){renderItems();renderSetup()}
@@ -927,13 +938,39 @@ function binSummaryLines(g){
       +(sp?`（店に並ぶ ${sp}時間）`:''));
   }
   return out}
+/* マスタに登録のある便だけを使う。未登録のジャンルは従来どおり1〜3便すべて */
+function binsUsed(g){
+  g=g||G();
+  if(!g.binmx)return [0,1,2];
+  const m=binmx(g),out=[];
+  for(let i=0;i<3;i++){
+    const dv=m.deliv[i],wt=m.waste[i];
+    if(dv.d!=null||dv.t.length||wt.d!=null||wt.t.length)out.push(i)}
+  return out.length?out:[0,1,2]}
+/* 便の見出しに廃棄時刻を添える（例「2便 14時廃棄」） */
+function binLabel(g,i,short){
+  const base=(i+1)+'便';
+  g=g||G();
+  if(!g.binmx)return base;
+  const t=binmx(g).waste[i].t;
+  if(!t||!t.length)return base;
+  return base+(short?' ':'\n')+t.join('・')+'時廃棄'}
+let BM_EDIT=false;
+function bmEdit(on){BM_EDIT=on;renderBinMx()}
+function bmSwitchGen(){BM_EDIT=false;renderBinMx()}
 function renderBinMx(){
   const sel=$('bm_gen');if(!sel)return;
   if(!sel.options.length){
     GEN.forEach(([k,nm])=>{const o=document.createElement('option');o.value=k;o.textContent=nm;sel.appendChild(o)});
     sel.value=DB.active}
   const g=bmGroup(),m=binmx(g);
-  const th=$('bmth');th.textContent='';
+  const th=$('bmth'),done=binSummaryLines(g).length>0;
+  // 登録済みのジャンルは、登録した便だけを一覧で見せる（編集ボタンで表に戻す）
+  $('bmwrap').style.display=(done&&!BM_EDIT)?'none':'';
+  $('bmhelp').style.display=(done&&!BM_EDIT)?'none':'';
+  $('bmEditBtn').style.display=(done&&!BM_EDIT)?'':'none';
+  $('bmDoneBtn').style.display=(done&&!BM_EDIT)?'none':'';
+  th.textContent='';
   const hr=document.createElement('tr');
   [['',''],['便','l'],['日','']].slice(1).forEach(([t,c])=>{
     const e=document.createElement('th');e.className=c;e.textContent=t;hr.appendChild(e)});

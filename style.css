@@ -99,9 +99,14 @@ padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;
   .nm1-name{white-space:normal;overflow:visible;text-overflow:clip}
   .nm2{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   #itb input{width:100%;padding:8px 2px;font-size:16px}
-  .bl{display:block;font-size:9px;color:var(--muted);text-align:center;line-height:1.2}
+  .bl{display:block;font-size:9px;white-space:pre-line;color:var(--muted);text-align:center;line-height:1.2}
   .tot{font-size:15px;padding-left:4px!important}
   #itb tr.sum{grid-template-columns:1fr 1fr 1fr 1fr;font-size:14px}
+  /* 使う便が1〜2便だけのジャンルは、その数に合わせて列を詰める */
+  #itb.bins2 tr{grid-template-columns:26px 1fr 1fr 34px}
+  #itb.bins1 tr{grid-template-columns:26px 1fr 34px}
+  #itb.bins2 tr.sum{grid-template-columns:1fr 1fr 1fr}
+  #itb.bins1 tr.sum{grid-template-columns:1fr 1fr}
   #itb tr.sum td:first-child{grid-column:1/-1;margin-bottom:2px}
   #itb tr.sum td:nth-child(2){display:none}
 }
