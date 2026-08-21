@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=202608211948">
+<link rel="stylesheet" href="style.css?v=202608211954">
 </head><body>
 
 <header>
@@ -125,7 +125,11 @@
 <input id=h_d placeholder="8/21" style="flex:1;text-align:center">
 <button class="gh sm" style="flex:0 0 auto" onclick="shiftHistDate(1)">▶</button>
 </div></div>
-<div><label>天候</label><input id=h_w placeholder="曇のち雨"></div></div>
+<div><label>天候（自動）</label><div style="display:flex;gap:4px">
+<input id=h_w placeholder="曇のち雨" style="flex:1">
+<button class="gh sm" style="flex:0 0 auto" onclick="autoHistWeather(document.getElementById('h_d').value,true)" title="この日の天気を取り直して上書き">🌤</button>
+</div></div></div>
+<p class=note id=h_wsts></p>
 <div class="fg g4">
 <div><label class=stoconai>ストコンAI</label><input id=h_ai type=number></div>
 <div><label>納品</label><input id=h_n type=number></div>
@@ -220,6 +224,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=202608211948"></script>
-<script src="app.js?v=202608211948"></script>
+<script src="data.js?v=202608211954"></script>
+<script src="app.js?v=202608211954"></script>
 </body></html>

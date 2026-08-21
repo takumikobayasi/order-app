@@ -61,6 +61,53 @@ function wmoLabel(c){
   if([71,73,75,77,85,86].includes(c))return '雪';
   if([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(c))return '雨';
   return '曇'}
+/* 日付文字列("8/21"等)→ "YYYY-MM-DD"。年をまたぐ入力も前後1年の近い方に寄せる */
+function ymdOf(d){
+  const m=(d||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
+  if(!m)return null;
+  const now=new Date(),mo=+m[1],da=+m[2];
+  let y=now.getFullYear();
+  // 12月に「1/3」を入れたら翌年、1月に「12/28」を入れたら前年とみなす
+  if(now.getMonth()+1>=11&&mo<=2)y++;
+  else if(now.getMonth()+1<=2&&mo>=11)y--;
+  return y+'-'+String(mo).padStart(2,'0')+'-'+String(da).padStart(2,'0')}
+
+/* 取得済みの天気はローカルに貯めておく（日付を送り戻しても即表示・通信を減らす） */
+const WX_KEY='hacchu.wx.v1';
+function wxCache(){try{return JSON.parse(localStorage.getItem(WX_KEY)||'{}')}catch(e){return {}}}
+function wxGet(k){const c=wxCache();return c[k]||null}
+function wxPut(k,v){const c=wxCache();c[k]=v;
+  // 古いものから間引いて上限400件
+  const ks=Object.keys(c);if(ks.length>400)ks.slice(0,ks.length-400).forEach(x=>delete c[x]);
+  try{localStorage.setItem(WX_KEY,JSON.stringify(c))}catch(e){}}
+
+/* 指定日の「朝◯/昼◯/夕◯」を返す。過去日は確定値、未来日は予報。取れなければ null */
+async function weatherForDate(dateStr){
+  const loc=getLoc();if(!loc||!dateStr)return null;
+  const key=loc.lat.toFixed(3)+','+loc.lon.toFixed(3)+'@'+dateStr;
+  const today=new Date();today.setHours(0,0,0,0);
+  const isPast=new Date(dateStr+'T00:00:00')<today;
+  // 過去日は確定値なので一度取れたら使い回す。未来日は予報が変わるのでキャッシュしない
+  if(isPast){const c=wxGet(key);if(c)return c}
+  const q=`latitude=${loc.lat}&longitude=${loc.lon}&hourly=weathercode&timezone=Asia%2FTokyo&start_date=${dateStr}&end_date=${dateStr}`;
+  // 予報API（過去92日〜未来16日）→ ダメなら過去データAPI（何年前でも可・約5日遅れ）
+  const urls=isPast
+    ? [`https://api.open-meteo.com/v1/forecast?${q}`,`https://archive-api.open-meteo.com/v1/archive?${q}`]
+    : [`https://api.open-meteo.com/v1/forecast?${q}`];
+  for(const url of urls){
+    try{
+      const res=await fetch(url);
+      const data=await res.json();
+      const codes=data.hourly&&data.hourly.weathercode;
+      if(!codes||codes.length<18||codes[7]==null||codes[12]==null||codes[17]==null)continue;
+      // 朝(7時=1便の売れ筋帯)/昼(12時=2便)/夕(17時=3便)の3時点で代表させる
+      const v=`朝${wmoLabel(codes[7])}/昼${wmoLabel(codes[12])}/夕${wmoLabel(codes[17])}`;
+      if(isPast)wxPut(key,v);
+      return v;
+    }catch(e){}
+  }
+  return null}
+
 async function fetchWeather(){
   const loc=getLoc();
   if(!loc){alert('先に「設定」から地域を登録してください');dlg('dSet');return}
@@ -69,23 +116,36 @@ async function fetchWeather(){
     $('dt').value=(tmr.getMonth()+1)+'/'+tmr.getDate();
     G().cur.dt=$('dt').value;applyDow();$('tq').value='';$('ta').value='';
   }
-  const m=($('dt').value||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
-  if(!m){alert('納品日を「8/21」のように入力してください');return}
-  const now=new Date();let y=now.getFullYear(),mo=+m[1],da=+m[2];
-  if(now.getMonth()+1>=11&&mo<=2)y++;
-  const dateStr=y+'-'+String(mo).padStart(2,'0')+'-'+String(da).padStart(2,'0');
+  const dateStr=ymdOf($('dt').value);
+  if(!dateStr){alert('納品日を「8/21」のように入力してください');return}
   flash('天気を取得中...');
-  try{
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=weathercode&timezone=Asia%2FTokyo&start_date=${dateStr}&end_date=${dateStr}`;
-    const res=await fetch(url);
-    const data=await res.json();
-    const codes=data.hourly&&data.hourly.weathercode;
-    if(!codes||codes.length<18){alert('天気予報の取得範囲外でした（直近16日以内の日付のみ対応）');flash('取得失敗');return}
-    // 朝(7時=1便の売れ筋帯)/昼(12時=2便)/夕(17時=3便)の3時点で代表させる
-    $('wthr').value=`朝${wmoLabel(codes[7])}/昼${wmoLabel(codes[12])}/夕${wmoLabel(codes[17])}`;
-    G().cur.wthr=$('wthr').value;renderSetup();autosave();
-    flash('天気を取得しました');
-  }catch(e){alert('天気の取得に失敗しました。通信環境をご確認ください');flash('取得失敗')}
+  const v=await weatherForDate(dateStr);
+  if(!v){alert('天気の取得に失敗しました（通信環境、または対応範囲外の日付です）');flash('取得失敗');return}
+  $('wthr').value=v;
+  G().cur.wthr=v;renderSetup();autosave();
+  flash('天気を取得しました');
+}
+
+/* 実績記録の日付が変わるたび、その日の確定天気を自動で入れる */
+let HW_SEQ=0;
+async function autoHistWeather(d,force){
+  const el=$('h_wsts');const seq=++HW_SEQ;
+  const dateStr=ymdOf(d);
+  if(!dateStr){if(el)el.textContent='';return}
+  if(el){el.className='note';el.textContent='天気を取得中...'}
+  const v=await weatherForDate(dateStr);
+  if(seq!==HW_SEQ)return;                      // 連打で日付が進んだら古い結果は捨てる
+  if(!v){if(el){el.className='note';el.textContent='天気は取得できませんでした（手入力できます）'}return}
+  const today=new Date();today.setHours(0,0,0,0);
+  const label=new Date(dateStr+'T00:00:00')<today?'確定の天気':'予報';
+  if(force||!$('h_w').value.trim()){
+    $('h_w').value=v;
+    if(el){el.className='note ok';el.textContent=`🌤 ${label}を自動入力しました`}
+  }else if($('h_w').value.trim()===v){
+    if(el){el.className='note ok';el.textContent=`🌤 ${label}と一致`}
+  }else{
+    if(el){el.className='note';el.textContent=`🌤 ${label}は「${v}」（🌤ボタンで上書き）`}
+  }
 }
 
 /* ---------- クラウド同期 (CORS完全回避版) ---------- */
@@ -692,6 +752,7 @@ function loadHistDate(d){
   set('h_m',r.m);
   // 去年の同時期のメモを表示（なぜうまくいった/いかなかったかの振り返り用）
   showLastYearNote(d);
+  autoHistWeather(d);
   const sb=r.sb||[null,null,null],hab=r.hab||[null,null,null];
   // 便別納品：記録済みならそれを、なければその日の発注データから自動入力
   let nb=r.nb;
