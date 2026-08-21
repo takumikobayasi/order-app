@@ -360,6 +360,20 @@ function renderSetup(){
         ? `${cyc}日分=${need}個 必要だが期限${shelf}日で売り切れるのは${cap}個まで。${over}個は期限切れリスク（分けて発注を検討）`
         : `${cyc}日分=${need}個（期限${shelf}日で${cap}個まで売り切れる範囲内）`,
       over>0?'warn':'ok']);
+    // 初日にどれだけ売れるかを見て、次回発注日まで在庫がもつか判定する
+    const r1=(i&&i.r)?i.r[0]/100:0.59;        // 1便構成比＝初日に集中する割合の目安
+    const day1=Math.round(dem*(1+r1));        // 初日に売れる想定（当日需要＋翌朝の立ち上がり分）
+    if(s.T){
+      const left=s.T-day1;
+      const daysLeft=dem>0?(s.T/dem):0;
+      rows.splice(rows.length-1,0,['在庫のもち',
+        left<=0
+          ? `発注${s.T}個は初日想定${day1}個で尽きる見込み。次回発注(${cyc}日後)まで欠品`
+          : daysLeft<cyc
+            ? `発注${s.T}個は約${daysLeft.toFixed(1)}日分。次回発注(${cyc}日後)まで${(cyc-daysLeft).toFixed(1)}日ぶん不足`
+            : `発注${s.T}個は約${daysLeft.toFixed(1)}日分。次回発注(${cyc}日後)まで在庫はもつ見込み`,
+        (left<=0||daysLeft<cyc)?'crit':'ok']);
+    }
   }
   if(g.binNote)rows.splice(rows.length-1,0,['便構成',g.binNote,'']);
   const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
