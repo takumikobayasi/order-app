@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=202608210703">
+<link rel="stylesheet" href="style.css?v=202608210721">
 </head><body>
 
 <header>
@@ -168,6 +168,12 @@
 <div><label>平常の週平均 販売数</label><input id=s_base type=number></div>
 <div><label>上乗せ倍率（企画中など）</label><input id=s_up type=number step=0.05></div></div>
 <p class=note id=s_base_sug></p>
+<div class="fg g3">
+<div><label>消費期限（日）</label><input id=s_shelf type=number step=0.5 placeholder="例 2"></div>
+<div><label>発注サイクル（日おき）</label><input id=s_cycle type=number placeholder="例 2"></div>
+<div><label>便構成メモ</label><input id=s_binnote placeholder="例 1便・3便発注"></div>
+</div>
+<p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
@@ -214,6 +220,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=202608210703"></script>
-<script src="app.js?v=202608210703"></script>
+<script src="data.js?v=202608210721"></script>
+<script src="app.js?v=202608210721"></script>
 </body></html>
