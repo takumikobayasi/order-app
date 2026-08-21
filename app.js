@@ -326,7 +326,7 @@ function renderItems(){
   const g=G();
   const H=$('ith');H.textContent='';
   const hr=document.createElement('tr');
-  const showOther=!SORT&&MODE!=='w';
+  const showOther=!SORT;
   const cols=SORT?['','商品',' ','1便','2便','3便','計']:['商品','適','1便','2便','3便','計',...(showOther?['他']:[])];
   cols.forEach((c,ix)=>{const th=document.createElement('th');th.textContent=c;
     if((SORT&&ix===1)||(!SORT&&ix===0))th.className='l';
@@ -404,14 +404,14 @@ function renderItems(){
     const t6=document.createElement('td');t6.className='tot';
     t6.textContent=v.reduce((a,c)=>a+(c||0),0)||'';tr.appendChild(t6);
     if(showOther){const t7=document.createElement('td');t7.className='col-other';t7.style.fontSize='11px';t7.style.color='var(--muted)';
-      const oth=MODE==='o'?['i','a']:MODE==='i'?['o','a']:['o','i'];
+      const oth=MODE==='o'?['i']:['o'];
       t7.textContent=oth.map(m=>{const x=vv(r.id,m).reduce((a,c)=>a+(c||0),0);return x||'-'}).join('/');
       tr.appendChild(t7)}
     B.appendChild(tr)});
   addSum()}
 function addSum(){const s=sums(MODE),tr=document.createElement('tr');tr.className='sum';
   const c=(t,cl)=>{const td=document.createElement('td');td.textContent=t;if(cl)td.className=cl;tr.appendChild(td)};
-  const showOther=!SORT&&MODE!=='w';
+  const showOther=!SORT;
   if(SORT)c('');c('合計 '+s.n+'品','l');c('');
   c(s.b[0]);c(s.b[1]);c(s.b[2]);c(s.T);
   if(showOther)c(s.amt.toLocaleString(),'col-other');
@@ -421,7 +421,7 @@ function mv(i,d){const a=G().items;const j=i+d;if(j<0||j>=a.length)return;
   [a[i],a[j]]=[a[j],a[i]];renderItems();autosave()}
 function toggleSort(){SORT=!SORT;$('sortb').textContent='並べ替え：'+(SORT?'ON':'OFF');
   $('sortb').setAttribute('aria-pressed',String(SORT));renderItems()}
-function setMode(m){MODE=m;['o','i','a','w'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
+function setMode(m){MODE=m;['o','i'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
 function toggleLockOverride(){LOCK_OVERRIDE=!LOCK_OVERRIDE;
   $('lockb').textContent=LOCK_OVERRIDE?'🔓 締切ロック解除中':'🔒 締切ロック解除';
   $('lockb').setAttribute('aria-pressed',String(LOCK_OVERRIDE));paintTotals()}
