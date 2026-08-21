@@ -120,7 +120,11 @@
 
 <dialog id=dHist><h2>実績を記録</h2>
 <div class="fg g2">
-<div><label>日付</label><input id=h_d placeholder="8/21"></div>
+<div><label>日付</label><div style="display:flex;gap:4px">
+<button class="gh sm" style="flex:0 0 auto" onclick="shiftHistDate(-1)">◀</button>
+<input id=h_d placeholder="8/21" style="flex:1;text-align:center">
+<button class="gh sm" style="flex:0 0 auto" onclick="shiftHistDate(1)">▶</button>
+</div></div>
 <div><label>天候</label><input id=h_w placeholder="曇のち雨"></div></div>
 <div class="fg g4">
 <div><label class=stoconai>ストコンAI</label><input id=h_ai type=number></div>
@@ -128,22 +132,21 @@
 <div><label>販売</label><input id=h_s type=number></div>
 <div><label>廃棄</label><input id=h_ha type=number></div></div>
 <div class="fg g3">
-<div><label>1便納品</label><input id=h_n1 type=number></div>
-<div><label>2便納品</label><input id=h_n2 type=number></div>
-<div><label>3便納品</label><input id=h_n3 type=number></div></div>
+<div><label>1便納品（自動）</label><input id=h_n1 type=number></div>
+<div><label>2便納品（自動）</label><input id=h_n2 type=number></div>
+<div><label>3便納品（自動）</label><input id=h_n3 type=number></div></div>
 <div class="fg g3">
 <div><label>1便販売</label><input id=h_s1 type=number></div>
 <div><label>2便販売</label><input id=h_s2 type=number></div>
 <div><label>3便販売</label><input id=h_s3 type=number></div></div>
 <div class="fg g3">
-<div><label>1便廃棄</label><input id=h_ha1 type=number></div>
-<div><label>2便廃棄</label><input id=h_ha2 type=number></div>
-<div><label>3便廃棄</label><input id=h_ha3 type=number></div></div>
+<div><label>1便廃棄（14時）</label><input id=h_ha1 type=number></div>
+<div><label>2便廃棄（21時）</label><input id=h_ha2 type=number></div>
+<div><label>3便廃棄（5時）</label><input id=h_ha3 type=number></div></div>
+<p class=note>便別納品はその日の発注データから自動入力されます。ストコン画面の廃棄は1便＝14時、2便＝21時、3便＝翌5時の位置に表示されます。</p>
 <div class="fg g2">
-<div><label>今朝の棚 総数</label><input id=h_am type=number></div>
 <div><label>欠品率%</label><input id=h_kk type=number step=0.1></div>
 <div><label>客数</label><input id=h_k type=number></div></div>
-<p class=note>販売数を空欄にすると「前日の棚＋納品−今朝の棚−廃棄」で自動計算します。</p>
 <div class="fg"><div><label>メモ</label><input id=h_m></div></div>
 <div class=btns style="margin-top:10px"><button onclick="saveHist()">記録</button>
 <button class=gh onclick="document.getElementById('dHist').close()">閉じる</button></div></dialog>
