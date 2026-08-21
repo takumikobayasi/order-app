@@ -876,7 +876,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('s_shelf').value=g.shelf||'';$('s_cycle').value=g.cycle||'';$('s_binnote').value=g.binNote||'';
   $('loc_status').textContent='現在の地域: '+getLoc().name;
-  renderMemos();
+  renderMemos();renderBinMx();
   const sug=suggestBase();
   $('s_base_sug').textContent=sug?`実績平均(特殊カレンダー・当日除く、${sug.n}日分): ${sug.avg}個`:'実績データがまだ足りません';
   const L=learnDow();
@@ -890,6 +890,85 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   const t=$('tglist');t.textContent=Object.keys(g.tgt).length
     ? '登録済: '+Object.entries(g.tgt).map(([k,v])=>`${k} ${v.q}個/${(v.a||0).toLocaleString()}円`).join('　')
     : '目標はまだありません'}
+/* ---------- 便と廃棄の時間マスタ（ジャンルごとに固定） ---------- */
+/* Day0=発注日。納品も廃棄も同じ時間軸で持つので、店に並ぶ時間を引き算で出せる */
+const BINT=[2,5,11,14,18,21,24];
+const BMDAYS=[[0,'発注日'],[1,'翌日'],[2,'2日後'],[3,'3日後'],[4,'4日後'],[5,'5日後'],[6,'6日後']];
+function binmx(g){
+  g=g||G();
+  if(!g.binmx)g.binmx={deliv:[],waste:[]};
+  ['deliv','waste'].forEach(k=>{
+    if(!Array.isArray(g.binmx[k]))g.binmx[k]=[];
+    for(let i=0;i<3;i++)if(!g.binmx[k][i])g.binmx[k][i]={d:null,t:[]};
+    g.binmx[k].length=3});
+  return g.binmx}
+function bmGenKey(){const el=$('bm_gen');return (el&&el.value)||DB.active}
+function bmGroup(){return DB.g[bmGenKey()]||G()}
+function setBinDay(kind,i,v){const m=binmx(bmGroup());
+  m[kind][i].d=v===''?null:Number(v);renderBinMx();autosave()}
+function toggleBinT(kind,i,t,on){const m=binmx(bmGroup()),a=m[kind][i];
+  a.t=(a.t||[]).filter(x=>x!==t);if(on)a.t.push(t);
+  a.t.sort((x,y)=>x-y);renderBinMx();autosave()}
+/* 納品〜廃棄の時間差。日と時刻が両方そろっている便だけ計算できる */
+function binSpan(g,i){
+  const m=binmx(g),dv=m.deliv[i],wt=m.waste[i];
+  if(dv.d==null||!dv.t.length||wt.d==null||!wt.t.length)return null;
+  const from=dv.d*24+Math.min(...dv.t), to=wt.d*24+Math.max(...wt.t);
+  return to>from?to-from:null}
+function binSummaryLines(g){
+  const m=binmx(g),out=[];
+  for(let i=0;i<3;i++){
+    const dv=m.deliv[i],wt=m.waste[i];
+    if(dv.d==null&&!dv.t.length&&wt.d==null&&!wt.t.length)continue;
+    const dayName=d=>d==null?'？':(BMDAYS[d]?BMDAYS[d][1]:d+'日後');
+    const times=a=>a&&a.length?a.join('時・')+'時':'？時';
+    const sp=binSpan(g,i);
+    out.push(`${i+1}便：${dayName(dv.d)}${dv.t.length?' '+times(dv.t):''}納品 → ${dayName(wt.d)} ${times(wt.t)}廃棄`
+      +(sp?`（店に並ぶ ${sp}時間）`:''));
+  }
+  return out}
+function renderBinMx(){
+  const sel=$('bm_gen');if(!sel)return;
+  if(!sel.options.length){
+    GEN.forEach(([k,nm])=>{const o=document.createElement('option');o.value=k;o.textContent=nm;sel.appendChild(o)});
+    sel.value=DB.active}
+  const g=bmGroup(),m=binmx(g);
+  const th=$('bmth');th.textContent='';
+  const hr=document.createElement('tr');
+  [['',''],['便','l'],['日','']].slice(1).forEach(([t,c])=>{
+    const e=document.createElement('th');e.className=c;e.textContent=t;hr.appendChild(e)});
+  BINT.forEach(t=>{const e=document.createElement('th');e.style.textAlign='center';e.textContent=t+'時';hr.appendChild(e)});
+  th.appendChild(hr);
+  const tb=$('bmtb');tb.textContent='';
+  [['deliv','納品日'],['waste','廃棄']].forEach(([kind,label])=>{
+    const hd=document.createElement('tr');
+    const hc=document.createElement('td');hc.className='l';hc.colSpan=2+BINT.length;
+    hc.style.fontWeight='700';hc.style.background='var(--bg)';hc.textContent=label;
+    hd.appendChild(hc);tb.appendChild(hd);
+    for(let i=0;i<3;i++){
+      const tr=document.createElement('tr');
+      const c1=document.createElement('td');c1.className='l';c1.textContent=(i+1)+'便';tr.appendChild(c1);
+      const c2=document.createElement('td');
+      const ds=document.createElement('select');ds.style.padding='4px 2px';ds.style.fontSize='12px';
+      const blank=document.createElement('option');blank.value='';blank.textContent='—';ds.appendChild(blank);
+      BMDAYS.forEach(([v,nm])=>{const o=document.createElement('option');o.value=v;o.textContent=nm;ds.appendChild(o)});
+      ds.value=m[kind][i].d==null?'':String(m[kind][i].d);
+      ds.onchange=e=>setBinDay(kind,i,e.target.value);
+      c2.appendChild(ds);tr.appendChild(c2);
+      BINT.forEach(t=>{
+        const c=document.createElement('td');c.style.textAlign='center';
+        const cb=document.createElement('input');cb.type='checkbox';
+        cb.style.width='20px';cb.style.height='20px';cb.style.padding='0';
+        cb.checked=(m[kind][i].t||[]).includes(t);
+        cb.onchange=e=>toggleBinT(kind,i,t,e.target.checked);
+        c.appendChild(cb);tr.appendChild(c)});
+      tb.appendChild(tr)}
+  });
+  const sum=$('bmsum');sum.textContent='';
+  const lines=binSummaryLines(g);
+  if(!lines.length){sum.className='note';sum.textContent='まだ設定されていません。'}
+  else{sum.className='note ok';lines.forEach(x=>{const d=document.createElement('div');d.textContent=x;sum.appendChild(d)})}
+}
 function showWipe(){$('wipeToggle').style.display='none';$('wipeBtn').style.display='';}
 function wipe(){if(!confirm('この端末のデータを全部消します。よろしいですか'))return;
   localStorage.removeItem(KEY);location.hash='';location.reload()}

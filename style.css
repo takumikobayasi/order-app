@@ -128,3 +128,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   th{font-size:12px;padding:8px 6px}
   td{padding:8px 6px}
 }
+
+/* 便と廃棄の時間マスタ：狭い画面でも7時刻ぶん並ぶよう列幅を詰める */
+#bmtbl{min-width:326px}
+#bmtbl th,#bmtbl td{padding:4px 1px}
+#bmtbl th{font-size:10px}
+#bmtbl td:first-child{white-space:nowrap;width:30px;font-size:12px}
+#bmtbl td:nth-child(2){width:70px}
+#bmtbl select{width:100%;padding:4px 2px;font-size:12px;text-align:center}
+#bmtbl input[type=checkbox]{margin:0}
