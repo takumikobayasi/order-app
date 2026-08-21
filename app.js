@@ -404,6 +404,13 @@ function renderItems(){
     if(r.memo)infoParts.push(r.memo);
     if(r.my)infoParts.push('本部目安'+r.my+'個');
     if(wf<1)infoParts.push(`廃棄実績${Math.round((1-wf)*100)}%減`);
+    // 蓄積した週次データが2週分以上あれば、前週との増減を表示
+    const trend=itemTrend(g,r.name);
+    if(trend.length>=2){
+      const a=trend[trend.length-1].sales,b=trend[trend.length-2].sales;
+      if(b>0){const d=Math.round((a-b)/b*100);
+        if(Math.abs(d)>=10)infoParts.push(`前週比${d>0?'+':''}${d}%(${b}→${a})`)}
+    }
     const n2=document.createElement('div');n2.className='nm2'+(wf<1?' nm2-warn':'');
     n2.textContent=infoParts.join(' ・ ');
     t1.append(n1,n2);
@@ -708,6 +715,31 @@ function copyWeeklyPrompt(type){
     .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
 }
 function normName(s){return (s||'').replace(/[\s　・！!（）()]/g,'')}
+/* 蓄積した週次スナップショットから、その商品の週販売数の推移を返す */
+function itemTrend(g,name){
+  const nx=normName(name),out=[];
+  (g.snap||[]).forEach(s=>{
+    if(s.type!=='tue'||!Array.isArray(s.items))return;
+    const it=s.items.find(x=>{const ni=normName(x.name);return ni===nx||ni.includes(nx)||nx.includes(ni)});
+    if(!it||!Array.isArray(it.ws))return;
+    const v=it.ws[it.ws.length-1];
+    if(v!=null)out.push({week:s.week,sales:v});
+  });
+  return out}
+/* 直近の月曜日を「その週」のキーにする（例 8/17） */
+function weekKey(dt){const d=dt?new Date(dt):new Date();
+  const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off);
+  return (d.getMonth()+1)+'/'+d.getDate()}
+/* 週次スナップショットを積み上げる。同じ週は上書き、日付順に保つ */
+function pushSnapshot(g,type,payload){
+  g.snap=g.snap||[];
+  const wk=weekKey();
+  const i=g.snap.findIndex(s=>s.week===wk&&s.type===type);
+  const rec={week:wk,type,at:new Date().toISOString().slice(0,10),...payload};
+  if(i>=0)g.snap[i]=rec;else g.snap.push(rec);
+  g.snap.sort((a,b)=>{const p=s=>{const m=(s.week||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};
+    return p(a)-p(b)||a.type.localeCompare(b.type)});
+}
 function importWeekly(){
   const m=$('wkbox').value.match(/#UPD1:\s*(\{[\s\S]*\})/);
   const msg=$('wkmsg');
@@ -727,7 +759,9 @@ function importWeekly(){
       cnt++});
     g.hist.sort((a,b)=>{const p=s=>{const mm=(s.d||'').match(/(\d+)\D+(\d+)/);return mm?+mm[1]*100+ +mm[2]:0};return p(a)-p(b)});
     g.wk.mon=today;
-    msg.className='note ok';msg.textContent=`✓ ${cnt}日分の実績を履歴に取り込みました（曜日係数・週平均の学習に使われます）`;
+    pushSnapshot(g,'mon',{days:d.days});
+    msg.className='note ok';msg.textContent=`✓ ${cnt}日分の実績を履歴に取り込みました（曜日係数・週平均の学習に使われます）`
+      +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
   }else if(d.type==='tue'&&Array.isArray(d.items)){
     let upd=0,added=0;const miss=[];
     d.items.forEach(x=>{
@@ -750,9 +784,13 @@ function importWeekly(){
       }else miss.push(x.name);
     });
     g.wk.tue=today;
+    // その週の品目別スナップショットを蓄積（上書きせず履歴として残す）
+    pushSnapshot(g,'tue',{items:d.items.map(x=>({name:x.name,price:x.price??null,
+      margin:x.margin??null,ai:x.ai||null,ws:x.ws||null,ww:x.ww||null}))});
     msg.className='note ok';
     msg.textContent=`✓ ${upd}品を更新`+(added?`、新商品${added}品を追加`:'')
-      +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`:'');
+      +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`:'')
+      +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
   }else{
     msg.className='note crit';msg.textContent='typeがmon/tueのどちらでもありません。プロンプトをコピーし直して試してください。';return;
   }
@@ -767,6 +805,16 @@ function renderWeekly(){
     const b=document.createElement('div');b.className='v '+(wk[k]?'ok':'warn');
     b.textContent=(wk[k]?`✓ ${wk[k]} 取込済`:'未取込')+'　'+t.guide;
     w.append(a,b);el.appendChild(w)});
+  // 蓄積状況（何週分たまっているか）
+  const snap=g.snap||[];
+  const weeks=[...new Set(snap.map(s=>s.week))];
+  const w=document.createElement('div');w.className='row';
+  const a=document.createElement('div');a.className='k';a.textContent='蓄積データ';
+  const b=document.createElement('div');b.className='v '+(weeks.length?'ok':'');
+  b.textContent=weeks.length
+    ? `${weeks.length}週分（${weeks.slice(-4).join('・')}${weeks.length>4?' 他':''}）取り込むほど精度が上がります`
+    : 'まだありません。取り込むと週ごとに蓄積されます';
+  w.append(a,b);el.appendChild(w);
 }
 
 /* ---------- 入出力 ---------- */
