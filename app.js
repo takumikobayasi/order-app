@@ -481,6 +481,7 @@ function renderItems(){
     tr.appendChild(t2);
     const v=vv(r.id,MODE);
     const LK=MODE==='o'?lockState():{c0:false,c12:false};
+    const t6=document.createElement('td');t6.className='tot';
     for(let i=0;i<3;i++){const td=document.createElement('td');
       const inp=document.createElement('input');inp.type='number';inp.inputMode='numeric';
       inp.dataset.row=ix;inp.dataset.col=i;
@@ -504,12 +505,19 @@ function renderItems(){
           if(prev)prev.focus();
         }
       };
+      // 表全体を作り直すとフォーカスが外れモバイルのキーボードが閉じてしまうため、
+      // 変更のあった行の合計と合計行だけを更新する
       inp.onchange=e=>{const x=e.target.value===''?null:Number(e.target.value);
-        setV(r.id,MODE,i,x);paintTotals();autosave()};
+        setV(r.id,MODE,i,x);
+        const badUnit=(r.unit||1)>1&&x!=null&&x%r.unit!==0;
+        inp.classList.toggle('bad-unit',badUnit);
+        inp.title=badUnit?`${r.unit}個単位です`:'';
+        const nv=vv(r.id,MODE);
+        t6.textContent=nv.reduce((a,c)=>a+(c||0),0)||'';
+        refreshSum();renderSetup();autosave()};
       // 狭い画面では見出し行を隠すため、各入力の上に便名を出す
       const bl=document.createElement('span');bl.className='bl';bl.textContent=(i+1)+'便';
       td.append(bl,inp);tr.appendChild(td)}
-    const t6=document.createElement('td');t6.className='tot';
     t6.textContent=v.reduce((a,c)=>a+(c||0),0)||'';tr.appendChild(t6);
     if(showOther){const t7=document.createElement('td');t7.className='col-other';t7.style.fontSize='11px';t7.style.color='var(--muted)';
       const oth=MODE==='o'?['i']:['o'];
@@ -517,6 +525,10 @@ function renderItems(){
       tr.appendChild(t7)}
     B.appendChild(tr)});
   addSum()}
+function refreshSum(){
+  const old=$('itb').querySelector('tr.sum');
+  if(old)old.remove();
+  addSum();}
 function addSum(){const s=sums(MODE),tr=document.createElement('tr');tr.className='sum';
   const c=(t,cl)=>{const td=document.createElement('td');td.textContent=t;if(cl)td.className=cl;tr.appendChild(td)};
   const showOther=!SORT;
