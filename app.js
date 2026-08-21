@@ -349,6 +349,19 @@ function renderSetup(){
     ['発注中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
   if(sp)rows.splice(2,0,['特殊カレンダー',`${sp}期間：ストコンAIの学習対象外のため意思入れ必須`,'crit']);
+  // 数日おきに発注するカテゴリ向け：期限内に売り切れる上限と、次回までに必要な数
+  const cyc=Number(g.cycle)||0, shelf=Number(g.shelf)||0;
+  if(cyc>1&&shelf>0&&dem){
+    const need=Math.round(dem*cyc);          // 次回発注日まで持たせるのに必要な数
+    const cap=Math.round(dem*shelf);          // 期限内に売り切れる上限
+    const over=need-cap;
+    rows.splice(rows.length-1,0,['期限と発注間隔',
+      over>0
+        ? `${cyc}日分=${need}個 必要だが期限${shelf}日で売り切れるのは${cap}個まで。${over}個は期限切れリスク（分けて発注を検討）`
+        : `${cyc}日分=${need}個（期限${shelf}日で${cap}個まで売り切れる範囲内）`,
+      over>0?'warn':'ok']);
+  }
+  if(g.binNote)rows.splice(rows.length-1,0,['便構成',g.binNote,'']);
   const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
   if(aiT&&dem){
     const diff=Math.round((dem-aiT)/aiT*100);
@@ -721,7 +734,10 @@ function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)}
   if(i>=0)G().hist[i]=rec;else G().hist.push(rec);
   G().hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
   $('dHist').close();renderHist();renderSetup();autosave();flash('記録しました')}
-function saveBase(){G().base=Number($('s_base').value)||0;G().up=Number($('s_up').value)||1;
+function saveBase(){const g=G();
+  g.base=Number($('s_base').value)||0;g.up=Number($('s_up').value)||1;
+  g.shelf=Number($('s_shelf').value)||0;g.cycle=Number($('s_cycle').value)||0;
+  g.binNote=$('s_binnote').value.trim();
   renderSetup();autosave();flash('保存しました')}
 /* 特殊カレンダー(GW/お盆/年末年始)と当日(集計未確定)を除いた実績平均を提案する */
 function suggestBase(){
@@ -739,6 +755,7 @@ function saveTgt(){const d=$('tg_d').value.trim();if(!d)return;
 function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('wipeToggle').style.display='';$('wipeBtn').style.display='none';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
+  $('s_shelf').value=g.shelf||'';$('s_cycle').value=g.cycle||'';$('s_binnote').value=g.binNote||'';
   $('loc_status').textContent='現在の地域: '+getLoc().name;
   renderMemos();
   const sug=suggestBase();
