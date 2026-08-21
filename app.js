@@ -153,14 +153,30 @@ function cloudLoad(){
   $('st').textContent='読込中...';
   
   const cbName = 'gasCallback_' + Date.now();
+  let done=false;
+  const timer=setTimeout(()=>{
+    if(done)return;done=true;
+    delete window[cbName];
+    if(script.parentNode) script.parentNode.removeChild(script);
+    alert('クラウドから応答がありませんでした。通信環境かGASのデプロイ設定をご確認ください。');
+    flash('読込タイムアウト');
+  },15000);
   window[cbName] = function(data){
+    if(done)return;done=true;clearTimeout(timer);
     delete window[cbName];
     if(script.parentNode) script.parentNode.removeChild(script);
     if(data && data.g){
+      const keepUrl=localStorage.getItem(GAS_KEY);
       DB = data;
+      DB.syncedTs = data.ts||0;
+      DB.pendingSync = false;
       save();
+      if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();
-      flash('☁️ クラウド読込完了');
+      $('dSet').close();
+      const n=Object.values(DB.g||{}).reduce((a,g)=>a+((g.items||[]).length),0);
+      flash('☁️ 読込完了');
+      alert(`クラウドから読み込みました（商品${n}品）`);
     }else{
       alert('Googleドライブに有効なデータがありませんでした');
       flash('読込完了(空)');
@@ -170,6 +186,7 @@ function cloudLoad(){
   const script = document.createElement('script');
   script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName + '&t=' + Date.now();
   script.onerror = function(){
+    if(done)return;done=true;clearTimeout(timer);
     delete window[cbName];
     if(script.parentNode) script.parentNode.removeChild(script);
     alert('クラウド読込に失敗しました。GASのデプロイ設定をご確認ください。');
