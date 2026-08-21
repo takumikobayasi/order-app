@@ -30,10 +30,11 @@
 <button class="gh sm" style="flex:0 0 auto" onclick="fetchWeather()">🌤自動</button>
 </div></div>
 </div>
-<div class="fg g3">
+<div class="fg g4">
 <div><label class=stoconai>ストコンAI 1便</label><input id=ai1 type=number placeholder="推奨値反映の数字"></div>
 <div><label class=stoconai>ストコンAI 2便</label><input id=ai2 type=number></div>
 <div><label class=stoconai>ストコンAI 3便</label><input id=ai3 type=number></div>
+<div><label class=stoconai>配信版</label><select id=aiver><option value="">未選択</option><option>7:30版</option><option>18時版</option><option>13:00版</option></select></div>
 </div>
 <div id=setup class=row-grid></div>
 <p class=note id=setupmsg></p>
@@ -103,12 +104,23 @@
 <textarea id=out readonly></textarea>
 </div>
 
+<div class=card>
+<h2><span class=n>5</span>週次データ取り込み（写真→AI→貼り付け）</h2>
+<div id=wklist class=row-grid></div>
+<div class=btns style="margin-top:8px">
+<button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('tue')">火曜用プロンプトをコピー</button>
+</div>
+<p class=note>コピーしたプロンプトを、撮った写真と一緒にAIチャット（ChatGPT・Gemini・Claudeなど何でもOK）に貼ると、取り込み用のデータが返ってきます。返ってきた「#UPD1:」で始まる文字列を下に貼り付けて「取り込む」を押してください。</p>
+<textarea id=wkbox placeholder="#UPD1:{...} をここに貼り付け"></textarea>
+<div class=btns style="margin-top:8px"><button class=sm onclick="importWeekly()">取り込む</button></div>
+<p class=note id=wkmsg></p>
+</div>
+
 </div>
 
 <div class=foot>
-<button class="cloud sm" onclick="cloudSave()">☁️ クラウド保存</button>
-<button class="gh sm" onclick="cloudLoad()">☁️ クラウド読込</button>
-<button class="sm" onclick="save();flash('端末に保存しました')">端末保存</button>
+<button class="cloud" onclick="syncCloud()">☁️ 同期（保存して共有）</button>
 <div class=st id=st></div>
 </div>
 
@@ -168,7 +180,8 @@
 <div class="fg">
 <div><label>GAS ウェブアプリURL</label><input id=gas_url placeholder="https://script.google.com/macros/s/.../exec"></div>
 </div>
-<div class=btns><button class=sm onclick="saveGasUrl()">同期URLを保存</button></div>
+<div class=btns><button class=sm onclick="saveGasUrl()">同期URLを保存</button>
+<button class="gh sm" onclick="cloudLoad()">クラウドから読み込む（復元）</button></div>
 <p class=note>設定するとスマホとiPadでボタン1つでデータ共有できます。</p>
 <h2 style="margin-top:14px">天気の自動取得（店舗の地域）</h2>
 <div class="fg">

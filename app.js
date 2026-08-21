@@ -14,7 +14,7 @@ function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0}
 function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',g}}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
-function save(){try{localStorage.setItem(KEY,b64e(JSON.stringify(DB)));$('st').textContent='保存 '+hm()}
+function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));$('st').textContent='保存 '+hm()}
   catch(e){$('st').textContent='保存エラー'}}
 function hm(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
 function flash(t){$('st').textContent=t;setTimeout(()=>$('st').textContent='保存 '+hm(),2000)}
@@ -91,6 +91,40 @@ async function cloudSave(){
     });
     flash('☁️ クラウド保存完了');
   }catch(e){alert('クラウド保存に失敗しました');flash('保存失敗')}
+}
+
+/* 同期＝端末保存＋クラウド保存を1ボタンで。失敗時は端末保存のままにして後で再同期 */
+async function syncCloud(){
+  save();
+  const url=getGasUrl();
+  if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
+  $('st').textContent='同期中...';
+  try{
+    await fetch(url,{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(DB)});
+    DB.pendingSync=false;save();
+    flash('☁️ 同期完了');
+  }catch(e){
+    DB.pendingSync=true;save();
+    flash('⚠ 端末に一時保存');
+    alert('クラウドに接続できませんでした。データは端末に一時保存されています。通信が戻ったらもう一度「☁️ 同期」を押してください。');
+  }
+}
+
+/* 起動時：クラウドの方が新しければ自動で読み込む（他の人の端末で同期された更新を反映） */
+function cloudLoadSilent(){
+  const url=getGasUrl();if(!url)return;
+  const cb='gasBoot_'+Date.now();
+  const s=document.createElement('script');
+  window[cb]=function(data){
+    delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);
+    if(data&&data.g&&(data.ts||0)>(DB.ts||0)&&!DB.pendingSync){
+      DB=data;save();renderAll();flash('☁️ 最新データを反映');
+    }
+  };
+  s.src=url+(url.includes('?')?'&':'?')+'callback='+cb+'&t='+Date.now();
+  s.onerror=function(){delete window[cb];if(s.parentNode)s.parentNode.removeChild(s)};
+  document.body.appendChild(s);
 }
 
 function cloudLoad(){
@@ -411,7 +445,8 @@ function renderAll(){renderTabs();
   $('wthr').value=g.cur.wthr||'';
   const ai=g.cur.ai||[null,null,null];
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
-  applyDow();renderItems();renderHist();renderSetup()}
+  $('aiver').value=g.cur.aiVer||'';
+  applyDow();renderItems();renderHist();renderSetup();renderWeekly()}
 
 /* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
 function wasteFactor(r){
@@ -586,6 +621,94 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
 function wipe(){if(!confirm('この端末のデータを全部消します。よろしいですか'))return;
   localStorage.removeItem(KEY);location.hash='';location.reload()}
 
+/* ---------- 週次データ取り込み（写真→AI→貼り付け） ---------- */
+const WK_TASKS={
+  mon:{label:'月曜：先週実績の写真',
+    guide:'ストコン「店舗分析→日別時系列推移グラフ（中分類：おむすび）」を数量表示で撮影（1枚）'},
+  tue:{label:'火曜：品揃え・新商品の写真',
+    guide:'ストコン「発注→品揃え状況確認・修正（おむすび）」を全ページ撮影（6枚前後）'}
+};
+function copyWeeklyPrompt(type){
+  const p=type==='mon'
+    ? `あなたはコンビニ発注データの読み取りアシスタントです。添付した「日別時系列推移グラフ（中分類）」画面の写真から、当年の日別実績を読み取り、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
+#UPD1:{"type":"mon","days":[{"d":"8/17","ai":134,"n":134,"s":126,"ha":14}]}
+ルール:
+- d=日付(月/日) ai=AI推奨 n=納品 s=販売 ha=廃棄。写真に写っている日をすべて含める
+- 読み取れない・空欄の値はnull
+- 集計途中の当日や、まだ実績のない未来日は含めない`
+    : `あなたはコンビニ発注データの読み取りアシスタントです。添付した「品揃え状況確認・修正」画面の写真（全ページ）から商品ごとの情報を読み取り、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
+#UPD1:{"type":"tue","items":[{"name":"直巻 明太子マヨネーズ","price":198,"margin":40.4,"ai":[4,2,0],"ws":[40,46,38,35],"ww":[2,2,0,1],"new":false}]}
+ルール:
+- name=商品名（写真の表記のまま） price=売価 margin=値入率%
+- ai=AI推奨値の1便/2便/3便（空欄は0）
+- ws=週販売数（4週前→直近週の順）、ww=週廃棄数（同順）。空欄は0
+- ランクに「導入」や赤い導入マークがある商品は new を true に
+- 全ページの全商品を含め、読み取れない値はnull`;
+  navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
+    .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
+}
+function normName(s){return (s||'').replace(/[\s　・！!（）()]/g,'')}
+function importWeekly(){
+  const m=$('wkbox').value.match(/#UPD1:\s*(\{[\s\S]*\})/);
+  const msg=$('wkmsg');
+  if(!m){msg.className='note crit';msg.textContent='「#UPD1:」で始まるデータが見つかりません。AIの返信をそのまま貼り付けてください。';return}
+  let d;try{d=JSON.parse(m[1])}catch(e){msg.className='note crit';msg.textContent='データを読めませんでした（形式エラー）。AIにもう一度形式どおりの出力を頼んでください。';return}
+  const g=G();g.wk=g.wk||{};
+  const today=(()=>{const t=new Date();return (t.getMonth()+1)+'/'+t.getDate()})();
+  if(d.type==='mon'&&Array.isArray(d.days)){
+    let cnt=0;
+    d.days.forEach(x=>{
+      if(!x.d)return;
+      const i=g.hist.findIndex(h=>h.d===x.d);
+      const old=i>=0?g.hist[i]:{};
+      const pick=(v,o)=>(v===null||v===undefined)?(o??null):v;
+      const rec={...old,d:x.d,ai:pick(x.ai,old.ai),n:pick(x.n,old.n),s:pick(x.s,old.s),ha:pick(x.ha,old.ha)};
+      if(i>=0)g.hist[i]=rec;else g.hist.push(rec);
+      cnt++});
+    g.hist.sort((a,b)=>{const p=s=>{const mm=(s.d||'').match(/(\d+)\D+(\d+)/);return mm?+mm[1]*100+ +mm[2]:0};return p(a)-p(b)});
+    g.wk.mon=today;
+    msg.className='note ok';msg.textContent=`✓ ${cnt}日分の実績を履歴に取り込みました（曜日係数・週平均の学習に使われます）`;
+  }else if(d.type==='tue'&&Array.isArray(d.items)){
+    let upd=0,added=0;const miss=[];
+    d.items.forEach(x=>{
+      if(!x.name)return;
+      const nx=normName(x.name);
+      let r=g.items.find(it=>{const ni=normName(it.name);return ni===nx||ni.includes(nx)||nx.includes(ni)});
+      if(r){
+        if(x.margin!=null)r.margin=x.margin;
+        r.pos={sales:x.ws||null,waste:x.ww||null,ai:x.ai||null};
+        if(Array.isArray(x.ai)&&x.ai.some(v=>v)){
+          const c=g.cur.v;c[r.id]=c[r.id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
+          c[r.id].i=x.ai.map(v=>v||null)}
+        upd++;
+      }else if(x.new){
+        const o={id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),
+          name:x.name,price:x.price?Math.round(x.price/1.08):0,day:0,unit:1,grade:'新',
+          my:0,tag:'新',memo:'週次取込で自動追加',margin:x.margin??undefined,
+          pos:{sales:x.ws||null,waste:x.ww||null,ai:x.ai||null}};
+        g.items.push(o);added++;
+      }else miss.push(x.name);
+    });
+    g.wk.tue=today;
+    msg.className='note ok';
+    msg.textContent=`✓ ${upd}品を更新`+(added?`、新商品${added}品を追加`:'')
+      +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`:'');
+  }else{
+    msg.className='note crit';msg.textContent='typeがmon/tueのどちらでもありません。プロンプトをコピーし直して試してください。';return;
+  }
+  $('wkbox').value='';renderAll();autosave();
+}
+function renderWeekly(){
+  const el=$('wklist');if(!el)return;el.textContent='';
+  const g=G(),wk=g.wk||{};
+  Object.entries(WK_TASKS).forEach(([k,t])=>{
+    const w=document.createElement('div');w.className='row';
+    const a=document.createElement('div');a.className='k';a.textContent=t.label;
+    const b=document.createElement('div');b.className='v '+(wk[k]?'ok':'warn');
+    b.textContent=(wk[k]?`✓ ${wk[k]} 取込済`:'未取込')+'　'+t.guide;
+    w.append(a,b);el.appendChild(w)});
+}
+
 /* ---------- 入出力 ---------- */
 function outPrompt(){
   const g=G(),s=sums('o'),ai=sums('i');
@@ -605,7 +728,7 @@ function outPrompt(){
     `本部目標: ${t?t.q+'個 / '+(t.a||0).toLocaleString()+'円':'未設定'}`,
     `需要見込み(提案数): ${D?D.q+'個 ('+D.src+')':'未設定'}`,
     ...((()=>{const aiT=['ai1','ai2','ai3'].reduce((a,id)=>a+(Number($(id).value)||0),0);
-      return aiT?[`ストコンAI推奨合計(推奨値反映): ${aiT}個（1便${$('ai1').value||0}/2便${$('ai2').value||0}/3便${$('ai3').value||0}）`]:[]})()),
+      return aiT?[`ストコンAI推奨合計(推奨値反映${$('aiver').value?'・'+$('aiver').value:''}): ${aiT}個（1便${$('ai1').value||0}/2便${$('ai2').value||0}/3便${$('ai3').value||0}）`]:[]})()),
     `発注合計: ${s.T}個 (${s.b.join('/')}) 納品金額: ${s.amt.toLocaleString()}円`,
     `\n## 直近の実績推移`,
     h.length?h.join('\n'):'実績データなし',
@@ -673,7 +796,9 @@ document.querySelectorAll('.hscroll').forEach(enableDragScroll);
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
   renderSetup();autosave()}));
+$('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;autosave()});
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
 GEN.forEach(([k,n,i])=>{if(!DB.g[k])DB.g[k]=blank(n,i)});
 renderAll();save();
+cloudLoadSilent();
