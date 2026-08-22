@@ -35,6 +35,23 @@ function cleanMemoDisplayTest(){
   if(DB.memoDisplayTestV1!==undefined){delete DB.memoDisplayTestV1;changed=true}
   if(changed)save();
 }
+/* 写真で確認できたおむすびの日別実績を一度だけ補完する。 */
+function applyPhotoActualFix(){
+  if(DB.photoActualFixV1)return;
+  const g=DB.g&&DB.g.onigiri;if(!g)return;
+  const y=new Date().getFullYear();
+  const fixes=[
+    {d:'8/19',n:135,s:130,ha:2},
+    {d:'8/20',n:186,s:140,ha:15}
+  ];
+  fixes.forEach(f=>{
+    const old=g.hist.find(h=>h.d===f.d&&(h.y||y)===y);
+    if(old)Object.assign(old,f,y?{y}:{});
+    else g.hist.push({...f,y});
+  });
+  g.hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
+  DB.photoActualFixV1=true;save();
+}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
 function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
@@ -1452,6 +1469,7 @@ if(!DB.g)DB=fresh();
 })();
 ensureCategories();
 cleanMemoDisplayTest();
+applyPhotoActualFix();
 renderAll();save();
 cloudLoadSilent();
 
