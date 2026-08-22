@@ -24,6 +24,26 @@ function ensureCategories(){
   });
   if(!DB.g[DB.active])DB.active=GEN[0][0];
 }
+/* TEMP: メモの週別/月別表示を確認するための試験データ。次回更新で削除予定。 */
+function seedMemoDisplayTest(){
+  if(DB.memoDisplayTestV1)return;
+  const g=DB.g&&DB.g.onigiri;if(!g)return;
+  const y=new Date().getFullYear();
+  const samples=[
+    ['8/2','【テスト】月初の日曜。朝の動きを確認'],
+    ['8/6','【テスト】雨で来店が少なめ'],
+    ['8/9','【テスト】週末で昼の販売が強め'],
+    ['8/13','【テスト】お盆休み。自分も休みで通常と違う動き'],
+    ['8/14','【テスト】お盆休み。帰省客の影響を確認'],
+    ['8/16','【テスト】お盆休み最終日'],
+    ['8/21','【テスト】週末前の発注を確認']
+  ];
+  samples.forEach(([d,m])=>{
+    if(!g.hist.some(h=>h.d===d&&(h.y||y)===y))g.hist.push({d,y,m});
+  });
+  g.hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
+  DB.memoDisplayTestV1=true;save();
+}
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
 function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
@@ -1419,6 +1439,7 @@ if(!DB.g)DB=fresh();
   if(items===0&&hist===0)DB=fresh();
 })();
 ensureCategories();
+seedMemoDisplayTest();
 renderAll();save();
 cloudLoadSilent();
 
