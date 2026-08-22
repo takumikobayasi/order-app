@@ -569,6 +569,7 @@ function renderSetup(){
   else if(!s.T){m.className='note warn';m.textContent='▲ 目標を入れて「配分」を押してください'}
   else{m.className='note ok';m.textContent='✓ 準備できています'}
   showMainLastYearNote($('dt').value);
+  renderMainMemos();
 }
 
 function renderItems(){
@@ -922,11 +923,13 @@ function saveHistDateDraft(){
 /* ---------- メモ一覧（週ごと/月ごとにまとめて表示） ---------- */
 let MEMO_VIEW='month';
 function setMemoView(v){MEMO_VIEW=v;
-  $('memoWeek').setAttribute('aria-pressed',String(v==='week'));
-  $('memoMonth').setAttribute('aria-pressed',String(v==='month'));
-  renderMemos()}
-function renderMemos(){
-  const el=$('memolist');if(!el)return;el.textContent='';
+  ['memoWeek','memoWeekMain'].forEach(id=>{if($(id))$(id).setAttribute('aria-pressed',String(v==='week'))});
+  ['memoMonth','memoMonthMain'].forEach(id=>{if($(id))$(id).setAttribute('aria-pressed',String(v==='month'))});
+  renderMemos();renderMainMemos()}
+function renderMemos(){renderMemoList($('memolist'))}
+function renderMainMemos(){renderMemoList($('mainMemolist'))}
+function renderMemoList(el){
+  if(!el)return;el.textContent='';
   const Y=new Date().getFullYear(),groups={};
   (G().hist||[]).forEach(h=>{
     if(!h.m)return;

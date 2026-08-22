@@ -44,6 +44,14 @@
 <div id=setup class=row-grid></div>
 <p class=note id=setupmsg></p>
 <p class=note id=mainLastYearNote style="display:none"></p>
+<div class=card id=mainMemoCard style="margin-top:10px">
+<h3 style="margin-top:0">メモ一覧</h3>
+<div class=btns>
+<button class="gh sm" id=memoWeekMain aria-pressed=false onclick="setMemoView('week')">週ごと</button>
+<button class="gh sm" id=memoMonthMain aria-pressed=true onclick="setMemoView('month')">月ごと</button>
+</div>
+<div id=mainMemolist class=row-grid></div>
+</div>
 </div>
 
 <div class=card>
@@ -219,12 +227,6 @@
 <button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
 </div>
 <p class=note>曜日係数の学習・週平均の提案に使われます。普段は見なくて大丈夫です。</p>
-<h2 style="margin-top:14px">メモ一覧（施策・イベントの記録）</h2>
-<div class=btns>
-<button class="gh sm" id=memoWeek aria-pressed=false onclick="setMemoView('week')">週ごと</button>
-<button class="gh sm" id=memoMonth aria-pressed=true onclick="setMemoView('month')">月ごと</button>
-</div>
-<div id=memolist class=row-grid></div>
 <h2 style="margin-top:14px">書き出し・AI連携・カメラ取込</h2>
 <div class=btns>
 <button class=sm onclick="outPrompt()">AI分析用プロンプト</button>
