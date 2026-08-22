@@ -50,7 +50,7 @@ function applyPhotoActualFix(){
     else g.hist.push({...f,y});
   });
   g.hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
-  DB.photoActualFixV1=true;save();
+  DB.photoActualFixV1=true;DB.pendingSync=true;save();
 }
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
