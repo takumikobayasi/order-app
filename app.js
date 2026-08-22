@@ -72,11 +72,11 @@ function toggleSettingsAdvanced(){
 function setMemoDisplay(on){
   DB.memoDisplay=!!on;save();renderMemoDisplaySetting();renderMainMemos();
 }
+function toggleMemoDisplay(){setMemoDisplay(DB.memoDisplay===false)}
 function renderMemoDisplaySetting(){
   const on=DB.memoDisplay!==false;
-  const a=$('memoDisplayOn'),b=$('memoDisplayOff'),s=$('memoDisplayStatus');
-  if(a)a.setAttribute('aria-pressed',String(on));
-  if(b)b.setAttribute('aria-pressed',String(!on));
+  const b=$('memoDisplayToggle'),s=$('memoDisplayStatus');
+  if(b){b.setAttribute('aria-pressed',String(on));b.textContent=on?'メモ表示：ON':'メモ表示：OFF';b.className=on?'sm':'gh sm'}
   if(s)s.textContent=on?'現在：表示（次回起動後も表示）':'現在：非表示（次回起動後も非表示）';
 }
 function toggleTheme(){const r=document.documentElement;
