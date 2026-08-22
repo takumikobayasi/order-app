@@ -969,10 +969,15 @@ function showMainLastYearNote(d){
   el.textContent='';el.style.display='none';
   const m=(d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
   const Y=new Date().getFullYear(),ly=Y-1,key=+m[1]+'/'+ +m[2];
-  const notes=(G().hist||[]).filter(h=>(h.y||Y)===ly&&h.d===key&&h.m).map(h=>h.m);
+  let notes=(G().hist||[]).filter(h=>(h.y||Y)===ly&&h.d===key&&h.m).map(h=>h.m);
+  let label='前年メモ（テスト表示）';
+  if(!notes.length){
+    notes=(G().hist||[]).filter(h=>(h.y||Y)===Y&&h.d===key&&h.m).map(h=>h.m);
+    label='今回のメモ（テスト表示）';
+  }
   if(!notes.length)return;
   el.className='note ok';
-  el.textContent='📌 前年メモ（テスト表示）：'+notes.join(' ／ ');
+  el.textContent='📌 '+label+'：'+notes.join(' ／ ');
   el.style.display='block';
 }
 function shiftHistDate(dir){
