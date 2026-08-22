@@ -36,7 +36,10 @@ let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
 function dlg(id){
   if(id==='dSet')renderSet();
-  if(id==='dMaster')renderBinMx();
+  if(id==='dMaster'){
+    const sel=$('bm_gen');if(sel&&sel.options.length)sel.value=DB.active;
+    renderBinMx();
+  }
   $(id).showModal()
 }
 function openMasterFromSettings(){
@@ -420,7 +423,10 @@ function getAiAdoption(){
 function renderTabs(){const el=$('tabs');el.textContent='';
   GEN.forEach(([k,n,ic])=>{const g=DB.g[k];const b=document.createElement('button');
     b.className='tab';b.setAttribute('aria-selected',String(k===DB.active));
-    b.onclick=()=>{DB.active=k;save();renderAll()};
+    b.onclick=()=>{DB.active=k;save();
+      const ms=$('bm_gen');if(ms)ms.value=k;
+      renderAll();
+      if($('dMaster')&&$('dMaster').open)renderBinMx()};
     const a=document.createElement('div');a.className='ic';a.textContent=ic;
     const c=document.createElement('div');c.className='nm';c.textContent=n;
     const d=document.createElement('div');d.className='ct';d.textContent=g.items.length?g.items.length+'品':'—';
