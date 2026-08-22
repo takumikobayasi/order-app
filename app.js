@@ -395,7 +395,8 @@ function setV(id,m,i,x){const c=G().cur.v;c[id]=c[id]||{o:[null,null,null],i:[nu
   c[id][m]=c[id][m]||[null,null,null];c[id][m][i]=x}
 function sums(m){const g=G(),b=[0,0,0];let amt=0,n=0;
   g.items.forEach(r=>{const v=vv(r.id,m);if(!v.some(x=>x!==null))return;
-    v.forEach((x,i)=>b[i]+=(x||0));const t=v.reduce((a,c)=>a+(c||0),0);amt+=(r.price||0)*t;if(t)n++});
+    let rt=0;v.forEach((x,i)=>{if(itemBins(r,G()).includes(i)){b[i]+=(x||0);rt+=(x||0)}});
+    amt+=(r.price||0)*rt;if(rt)n++});
   return{b,T:b[0]+b[1]+b[2],amt,n}}
 
 function getAiAdoption(){
@@ -562,9 +563,11 @@ function renderItems(){
     const LK=MODE==='i'?lockState():{c0:false,c12:false};
     const t6=document.createElement('td');t6.className='tot';
     BINS.forEach((i,ci)=>{const td=document.createElement('td');
+      const allowed=itemBins(r,g).includes(i);if(!allowed)td.className='bin-off';
       const inp=document.createElement('input');inp.type='number';inp.inputMode='numeric';
       inp.dataset.row=ix;inp.dataset.col=ci;
-      inp.value=v[i]===null?'':v[i];
+      inp.value=!allowed?'':(v[i]===null?'':v[i]);
+      if(!allowed){inp.disabled=true;inp.title='この商品は対象外の便です'}
       if((r.unit||1)>1&&v[i]!=null&&v[i]%r.unit!==0){
         inp.classList.add('bad-unit');inp.title=`${r.unit}個単位です`}
       const locked=(i===0&&LK.c0)||(i>0&&LK.c12);
@@ -740,9 +743,9 @@ function alloc(){
     live.forEach(r=>{
       const t3=top3.includes(r.id)?2:0,rest=Math.max(0,q[r.id]-t3);
       const t2=Math.round(rest*(p2/(p1+p2))),t1=rest-t2;
-      setAll(r.id,fix2([t1,t2,t3],r.unit))});
+      setAll(r.id,fix2([t1,t2,t3],r.unit).map((x,i)=>itemBins(r,g).includes(i)?x:0))});
   }
-  detailed.forEach(r=>setAll(r.id,vv(r.id,'i').map(x=>x||0)));   // 便別入力済みはそのまま提案に反映
+  detailed.forEach(r=>setAll(r.id,vv(r.id,'i').map((x,i)=>itemBins(r,g).includes(i)?(x||0):0)));   // 対象外便は0
   g.items.forEach(r=>{if(!(r.id in q)&&!hasDetail(r))setAll(r.id,[0,0,0])});
 
   MODE='o';setMode('o');paintTotals();autosave();
@@ -783,6 +786,8 @@ function saveItem(){const n=$('f_name').value.trim();if(!n){alert('商品名を�
   $('dItem').close();renderTabs();paintTotals();autosave();flash('保存しました')}
 function catInput(type,value,field,ix){const e=document.createElement('input');e.type=type;e.value=value??'';e.dataset.cat=field;e.dataset.ix=ix;return e}
 function catSelect(options,value,field,ix){const e=document.createElement('select');options.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;e.appendChild(o)});e.value=value==null?'':String(value);e.dataset.cat=field;e.dataset.ix=ix;return e}
+function catBins(r,g,ix){const box=document.createElement('div');box.className='cat-bins';const a=itemBins(r,g);
+  [0,1,2].forEach(i=>{const lab=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=a.includes(i);cb.dataset.cat='bin'+i;cb.dataset.ix=ix;lab.append(cb,document.createTextNode((i+1)+'便'));box.appendChild(lab)});return box}
 function openCatalog(){renderCatalog();$('dCatalog').showModal()}
 function renderCatalog(){
   const g=G();$('catTitle').textContent=g.name;const tb=$('catbody');tb.textContent='';
@@ -791,16 +796,18 @@ function renderCatalog(){
   const grades=[['◎','◎'],['○','○'],['△','△'],['×','×'],['新','新']],units=[['1','1個'],['2','2個']];
   g.items.forEach((r,ix)=>{const tr=document.createElement('tr');
     const fields=[catInput('text',r.name,'name',ix),catInput('number',r.price,'price',ix),catInput('number',r.day,'day',ix),
-      catSelect(grades,r.grade||'○','grade',ix),catSelect(units,r.unit||1,'unit',ix),catSelect([['','—'],...DCLS.map(d=>[d,'D'+d])],r.dclass,'dclass',ix),
+      catSelect(grades,r.grade||'○','grade',ix),catSelect(units,r.unit||1,'unit',ix),catSelect([['','—'],...DCLS.map(d=>[d,'D'+d])],r.dclass,'dclass',ix),catBins(r,g,ix),
       catInput('number',r.my,'my',ix),catInput('text',r.tag,'tag',ix),catInput('number',r.margin,'margin',ix),catInput('text',r.memo,'memo',ix)];
     fields.forEach((e,j)=>{const td=document.createElement('td');if(j===0)td.className='l';td.appendChild(e);tr.appendChild(td)});tb.appendChild(tr)})}
 function saveCatalog(){
   const g=G();$('catbody').querySelectorAll('[data-cat]').forEach(e=>{const r=g.items[+e.dataset.ix],f=e.dataset.cat;if(!r)return;
+    if(f.startsWith('bin'))return;
     if(f==='name')r.name=e.value.trim()||r.name;
     else if(f==='tag'||f==='memo')r[f]=e.value.trim();
     else if(f==='grade'||f==='unit'||f==='dclass')r[f]=e.value===''?undefined:(f==='unit'||f==='dclass'?Number(e.value):e.value);
     else r[f]=e.value===''?undefined:Number(e.value);
   });
+  g.items.forEach((r,ix)=>{r.orderBins=[0,1,2].filter(i=>{const e=$(`catbody`).querySelector(`[data-cat="bin${i}"][data-ix="${ix}"]`);return e&&e.checked})});
   $('dCatalog').close();renderTabs();paintTotals();autosave();flash('品揃えマスターを保存しました')}
 function delItem(){if(EDIT==null){$('dItem').close();return}
   if(!confirm('この商品を消しますか')) return;
@@ -1012,8 +1019,18 @@ function binSummaryLines(g){
   }});
   return out}
 /* マスタに登録のある便だけを使う。未登録のジャンルは従来どおり1〜3便すべて */
+function itemBins(r,g){
+  if(Array.isArray(r&&r.orderBins))return r.orderBins;
+  const m=binmx(g||G()),out=[];
+  for(let i=0;i<3;i++)if(m.dEnabled.some(d=>m.wasteD[d][i].t.length))out.push(i);
+  return out.length?out:[0,1,2];
+}
 function binsUsed(g){
   g=g||G();
+  if(g.items&&g.items.some(r=>Array.isArray(r.orderBins))){
+    const set=new Set();g.items.forEach(r=>itemBins(r,g).forEach(i=>set.add(i)));
+    return set.size?[...set].sort((a,b)=>a-b):[0,1,2];
+  }
   if(!g.binmx)return [0,1,2];
   const m=binmx(g),out=[];
   for(let i=0;i<3;i++){
