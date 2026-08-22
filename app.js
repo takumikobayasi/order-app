@@ -7,7 +7,7 @@ const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK4
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
-let DB=null, MODE='o', SORT=false, EDIT=null, LOCK_OVERRIDE=false;
+let DB=null, MODE='o', SORT=false, EDIT=null;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -343,11 +343,6 @@ function specialPeriod(t){
   if(mo===8&&d>=13&&d<=16)return 'お盆';
   if((mo===12&&d>=29)||(mo===1&&d<=3))return '年末年始';
   return null}
-/* 締切ロック：1便は発注日10:00、2便/3便は15:00でストコンへ送信済みとなり編集不可（マニュアル準拠） */
-function lockState(){
-  if(LOCK_OVERRIDE)return{c0:false,c12:false};
-  const t=new Date().getHours()*60+new Date().getMinutes();
-  return{c0:t>=600,c12:t>=900}}
 /* ストコンAI推奨値は1日に複数回配信される。今の時刻でどの版が最新かと、
    次にいつ更新されるかを返す（深夜勤務で前夜の版を見ているケースを明示するため） */
 function aiVersionNow(){
@@ -443,13 +438,10 @@ function renderSetup(){
   const aiAdp=getAiAdoption();
   if(t){if(!$('tq').value)$('tq').value=t.q;if(!$('ta').value)$('ta').value=t.a}
   const sp=specialPeriod($('dt').value);
-  const LK=lockState();
-  const lockTxt=LK.c12?'🔒 1便・2便・3便とも締切済（15:00）':LK.c0?'🔒 1便のみ締切済（10:00）／2便・3便は15:00まで編集可':'🔓 全便編集可（1便は10:00、2便・3便は15:00締切）';
   const rows=[
     ['納品日',$('dt').value.trim()||'未入力',$('dt').value.trim()?'':'warn'],
     ['曜日係数',i?`${i.d}曜 ${i.f.toFixed(2)}（${i.src}）`:'納品日を入れてください',i?'':'warn'],
     ['便構成比',i?`${i.type} ${i.r[0]}/${i.r[1]}/${i.r[2]}%`:'—',i?'ok':'warn'],
-    ['締切状況',lockTxt+(LOCK_OVERRIDE?'（手動解除中）':''),LK.c0?'warn':'ok'],
     ['提案の採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'提案がまだありません',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
     ['今日の需要見込み（提案数）',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
@@ -570,8 +562,6 @@ function renderItems(){
       sp.textContent=r.grade||'—';t2.appendChild(sp)}
     tr.appendChild(t2);
     const v=vv(r.id,MODE);
-    // 発注入力は時間帯によるロックをかけず、いつでも修正できるようにする
-    const LK={c0:false,c12:false};
     const t6=document.createElement('td');t6.className='tot';
     BINS.forEach((i,ci)=>{const td=document.createElement('td');
       const allowed=itemBins(r,g).includes(i);if(!allowed)td.className='bin-off';
@@ -581,8 +571,6 @@ function renderItems(){
       if(!allowed){inp.disabled=true;inp.title='この商品は対象外の便です'}
       if((r.unit||1)>1&&v[i]!=null&&v[i]%r.unit!==0){
         inp.classList.add('bad-unit');inp.title=`${r.unit}個単位です`}
-      const locked=(i===0&&LK.c0)||(i>0&&LK.c12);
-      if(locked){inp.disabled=true;inp.classList.add('locked');inp.title='締切済のため編集できません'}
       inp.onfocus=e=>e.target.select();
       inp.onkeydown=e=>{
         const rIx=+e.target.dataset.row, cIx=+e.target.dataset.col;
@@ -638,9 +626,6 @@ function mv(i,d){const a=G().items;const j=i+d;if(j<0||j>=a.length)return;
 function toggleSort(){SORT=!SORT;$('sortb').textContent=SORT?'並べ替え：ON（上下ボタン）':'並べ替え：OFF';
   $('sortb').setAttribute('aria-pressed',String(SORT));renderItems()}
 function setMode(m){MODE=m;['o','i'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
-function toggleLockOverride(){LOCK_OVERRIDE=!LOCK_OVERRIDE;
-  $('lockb').textContent=LOCK_OVERRIDE?'🔓 締切ロック解除中':'🔒 締切ロック解除';
-  $('lockb').setAttribute('aria-pressed',String(LOCK_OVERRIDE));paintTotals()}
 function fillFrom(src){G().items.forEach(r=>{const v=vv(r.id,src);
   if(v.some(x=>x!==null))v.forEach((x,i)=>setV(r.id,MODE,i,x))});paintTotals();autosave();flash('コピーしました')}
 function clearMode(){G().items.forEach(r=>{const c=G().cur.v[r.id];if(c)c[MODE]=[null,null,null]});
