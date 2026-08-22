@@ -781,6 +781,27 @@ function saveItem(){const n=$('f_name').value.trim();if(!n){alert('商品名を�
   if(EDIT==null){o.id='i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);G().items.push(o)}
   else G().items[EDIT]=Object.assign(G().items[EDIT],o);
   $('dItem').close();renderTabs();paintTotals();autosave();flash('保存しました')}
+function catInput(type,value,field,ix){const e=document.createElement('input');e.type=type;e.value=value??'';e.dataset.cat=field;e.dataset.ix=ix;return e}
+function catSelect(options,value,field,ix){const e=document.createElement('select');options.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;e.appendChild(o)});e.value=value==null?'':String(value);e.dataset.cat=field;e.dataset.ix=ix;return e}
+function openCatalog(){renderCatalog();$('dCatalog').showModal()}
+function renderCatalog(){
+  const g=G();$('catTitle').textContent=g.name;const tb=$('catbody');tb.textContent='';
+  if(!g.items.length){$('catmsg').textContent='商品がありません。「＋商品」から登録してください。';return}
+  $('catmsg').textContent='';
+  const grades=[['◎','◎'],['○','○'],['△','△'],['×','×'],['新','新']],units=[['1','1個'],['2','2個']];
+  g.items.forEach((r,ix)=>{const tr=document.createElement('tr');
+    const fields=[catInput('text',r.name,'name',ix),catInput('number',r.price,'price',ix),catInput('number',r.day,'day',ix),
+      catSelect(grades,r.grade||'○','grade',ix),catSelect(units,r.unit||1,'unit',ix),catSelect([['','—'],...DCLS.map(d=>[d,'D'+d])],r.dclass,'dclass',ix),
+      catInput('number',r.my,'my',ix),catInput('text',r.tag,'tag',ix),catInput('number',r.margin,'margin',ix),catInput('text',r.memo,'memo',ix)];
+    fields.forEach((e,j)=>{const td=document.createElement('td');if(j===0)td.className='l';td.appendChild(e);tr.appendChild(td)});tb.appendChild(tr)})}
+function saveCatalog(){
+  const g=G();$('catbody').querySelectorAll('[data-cat]').forEach(e=>{const r=g.items[+e.dataset.ix],f=e.dataset.cat;if(!r)return;
+    if(f==='name')r.name=e.value.trim()||r.name;
+    else if(f==='tag'||f==='memo')r[f]=e.value.trim();
+    else if(f==='grade'||f==='unit'||f==='dclass')r[f]=e.value===''?undefined:(f==='unit'||f==='dclass'?Number(e.value):e.value);
+    else r[f]=e.value===''?undefined:Number(e.value);
+  });
+  $('dCatalog').close();renderTabs();paintTotals();autosave();flash('品揃えマスターを保存しました')}
 function delItem(){if(EDIT==null){$('dItem').close();return}
   if(!confirm('この商品を消しますか')) return;
   const r=G().items[EDIT];delete G().cur.v[r.id];G().items.splice(EDIT,1);

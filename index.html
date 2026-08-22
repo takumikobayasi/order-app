@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260822sort2">
+<link rel="stylesheet" href="style.css?v=20260822catalog1">
 </head><body>
 
 <header>
@@ -69,6 +69,7 @@
 <button class="gh sm stoconai" onclick="fillFrom('i')">ストコンAIをコピー</button>
 <button class="gh sm" onclick="clearMode()">この列を消す</button>
 <button class="gh sm" onclick="editItem(null)">＋商品</button>
+<button class="gh sm" onclick="openCatalog()">品揃えマスター</button>
 <button class="gh sm" id=lockb aria-pressed=false onclick="toggleLockOverride()">🔒 締切ロック解除</button>
 </div>
 <div class=hscrollrow>
@@ -119,6 +120,16 @@
 <button onclick="saveItem()">保存</button>
 <button class=gh onclick="document.getElementById('dItem').close()">閉じる</button>
 <button class=gh style="color:var(--crit)" onclick="delItem()">削除</button></div></dialog>
+
+<dialog id=dCatalog class=wide>
+<h2>品揃えマスター：<span id=catTitle></span></h2>
+<p class=note>このジャンルの商品情報をまとめて変更できます。発注数量はこの画面では変更しません。</p>
+<div style="overflow-x:auto"><table id=cattbl><thead><tr>
+<th class=l>商品名</th><th>売価</th><th>日販</th><th>適性</th><th>単位</th><th>廃棄D</th><th>本部目安</th><th>印</th><th>値入率</th><th>メモ</th>
+</tr></thead><tbody id=catbody></tbody></table></div>
+<p class=note id=catmsg></p>
+<div class=btns style="margin-top:10px"><button onclick="saveCatalog()">まとめて保存</button>
+<button class=gh onclick="document.getElementById('dCatalog').close()">閉じる</button></div></dialog>
 
 <dialog id=dHist><h2>実績を記録</h2>
 <div class="fg g2">
@@ -245,6 +256,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=20260822sort2"></script>
-<script src="app.js?v=20260822sort2"></script>
+<script src="data.js?v=20260822catalog1"></script>
+<script src="app.js?v=20260822catalog1"></script>
 </body></html>
