@@ -938,6 +938,15 @@ function saveHistDateDraft(){
     nb:['h_n1','h_n2','h_n3'].map(n),sb:['h_s1','h_s2','h_s3'].map(n),hab:['h_ha1','h_ha2','h_ha3'].map(n)};
   autosave();
 }
+function updateHistTotals(){
+  const sum=ids=>{
+    const vals=ids.map(id=>$(id).value===''?null:Number($(id).value));
+    return vals.some(v=>v!==null)?vals.reduce((a,v)=>a+(v||0),0):null;
+  };
+  [['h_n',['h_n1','h_n2','h_n3']],['h_s',['h_s1','h_s2','h_s3']],['h_ha',['h_ha1','h_ha2','h_ha3']]].forEach(([out,ids])=>{
+    const v=sum(ids);if(v!==null)$(out).value=v;
+  });
+}
 /* ---------- メモ一覧（週ごと/月ごとにまとめて表示） ---------- */
 let MEMO_VIEW='month';
 function setMemoView(v){MEMO_VIEW=v;
@@ -1038,6 +1047,7 @@ function shiftHistDate(dir){
   loadHistDate((base.getMonth()+1)+'/'+base.getDate());
 }
 function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)};
+  updateHistTotals();
   const d=$('h_d').value.trim()||$('dt').value.trim();if(!d){alert('日付を入れてください');return}
   const nb=[n('h_n1'),n('h_n2'),n('h_n3')],sb=[n('h_s1'),n('h_s2'),n('h_s3')],hab=[n('h_ha1'),n('h_ha2'),n('h_ha3')];
   const Y=new Date().getFullYear();
@@ -1458,6 +1468,9 @@ $('wthr').addEventListener('input',()=>{
   if(!$('aiver').value){$('aiver').value=aiVersionNow().cur;G().cur.aiVer=$('aiver').value}
   renderSetup();autosave()}));
 $('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;renderSetup();autosave()});
+['h_n1','h_n2','h_n3','h_s1','h_s2','h_s3','h_ha1','h_ha2','h_ha3'].forEach(id=>$(id).addEventListener('input',()=>{
+  updateHistTotals();saveHistDateDraft();
+}));
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
 /* 保存データが空(商品0件かつ履歴0件)なら初期データから復旧する。
