@@ -570,7 +570,8 @@ function renderItems(){
       sp.textContent=r.grade||'—';t2.appendChild(sp)}
     tr.appendChild(t2);
     const v=vv(r.id,MODE);
-    const LK=MODE==='i'?lockState():{c0:false,c12:false};
+    // 発注入力は時間帯によるロックをかけず、いつでも修正できるようにする
+    const LK={c0:false,c12:false};
     const t6=document.createElement('td');t6.className='tot';
     BINS.forEach((i,ci)=>{const td=document.createElement('td');
       const allowed=itemBins(r,g).includes(i);if(!allowed)td.className='bin-off';
