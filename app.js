@@ -861,7 +861,9 @@ function openHist(){
   $('dHist').showModal()}
 function loadHistDate(d){
   const g=G(),Y=new Date().getFullYear();
-  const r=g.hist.find(x=>x.d===d&&(x.y||Y)===Y)||{};
+  const key=Y+'@'+d;
+  const draft=g.histDrafts&&g.histDrafts[key];
+  const r=draft||g.hist.find(x=>x.d===d&&(x.y||Y)===Y)||{};
   const set=(id,v)=>$(id).value=(v===null||v===undefined)?'':v;
   set('h_d',d);set('h_w',r.w);set('h_ai',r.ai);set('h_n',r.n);set('h_s',r.s);set('h_ha',r.ha);
   set('h_m',r.m);
@@ -877,6 +879,16 @@ function loadHistDate(d){
   if(!r.n&&nb.some(x=>x!=null))set('h_n',nb.reduce((a,x)=>a+(x||0),0));
   set('h_s1',sb[0]);set('h_s2',sb[1]);set('h_s3',sb[2]);
   set('h_ha1',hab[0]);set('h_ha2',hab[1]);set('h_ha3',hab[2]);
+}
+function histDraftKey(d){return new Date().getFullYear()+'@'+d}
+function saveHistDateDraft(){
+  const d=($('h_d')&&$('h_d').value||'').trim();
+  if(!orderDateParts(d))return;
+  const g=G(),n=x=>$(x).value===''?null:Number($(x).value);
+  g.histDrafts=g.histDrafts||{};
+  g.histDrafts[histDraftKey(d)]={w:$('h_w').value,ai:n('h_ai'),n:n('h_n'),s:n('h_s'),ha:n('h_ha'),m:$('h_m').value,
+    nb:['h_n1','h_n2','h_n3'].map(n),sb:['h_s1','h_s2','h_s3'].map(n),hab:['h_ha1','h_ha2','h_ha3'].map(n)};
+  autosave();
 }
 /* ---------- メモ一覧（週ごと/月ごとにまとめて表示） ---------- */
 let MEMO_VIEW='month';
@@ -943,6 +955,7 @@ function showLastYearNote(d){
   else{el.className='note';el.textContent=`去年（${ly}年）の${mo}月にはメモがありません`}
 }
 function shiftHistDate(dir){
+  saveHistDateDraft();
   const m=($('h_d').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
   const now=new Date();
   let base=m?new Date(now.getFullYear(),+m[1]-1,+m[2]):new Date(Date.now()-86400000);
@@ -966,6 +979,7 @@ function saveHist(){const n=x=>{const v=$(x).value;return v===''?null:Number(v)}
   if(rec.s==null&&rec.sb)rec.s=rec.sb.reduce((a,x)=>a+(x||0),0)||null;
   if(rec.n==null&&rec.nb)rec.n=rec.nb.reduce((a,x)=>a+(x||0),0)||null;
   if(i>=0)G().hist[i]=rec;else G().hist.push(rec);
+  if(G().histDrafts)delete G().histDrafts[Y+'@'+d];
   G().hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
   $('dHist').close();renderHist();renderSetup();autosave();flash('記録しました')}
 function saveBase(){const g=G();
@@ -1384,7 +1398,7 @@ cloudLoadSilent();
 
 /* 画面離脱・バックグラウンド移行時の保存漏れ防止。
    クラウド送信ではなく、まず端末の最新状態を同期的に保存する。 */
-function saveBeforeLeave(){saveOrderDateDraft();save()}
+function saveBeforeLeave(){saveOrderDateDraft();if($('dHist')&&$('dHist').open)saveHistDateDraft();save()}
 window.addEventListener('pagehide',saveBeforeLeave);
 window.addEventListener('beforeunload',saveBeforeLeave);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveBeforeLeave()});
