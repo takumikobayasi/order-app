@@ -51,6 +51,13 @@ function openCatalogFromSettings(){
   $('dSet').close();
   openCatalog();
 }
+function toggleSettingsAdvanced(){
+  const els=document.querySelectorAll('.settingsAdvanced');
+  const show=Array.from(els).some(el=>el.style.display==='none');
+  els.forEach(el=>el.style.display=show?'':'none');
+  const b=$('settingsAdvancedBtn');
+  if(b)b.textContent=show?'詳細設定を隠す':'詳細設定を表示';
+}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 

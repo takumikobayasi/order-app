@@ -168,6 +168,8 @@
 <button class=gh onclick="saveHistDateDraft();document.getElementById('dHist').close()">閉じる</button></div></dialog>
 
 <dialog id=dSet><h2>設定</h2>
+<div class=btns><button class="gh sm" id=settingsAdvancedBtn onclick="toggleSettingsAdvanced()">詳細設定を表示</button></div>
+<div class=settingsAdvanced style="display:none">
 <h2 style="margin-top:0">Googleドライブ自動同期設定</h2>
 <div class="fg">
 <div><label>GAS ウェブアプリURL</label><input id=gas_url placeholder="https://script.google.com/macros/s/.../exec"></div>
@@ -193,12 +195,14 @@
 </div>
 <p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
+</div>
 <h2 style="margin-top:14px">販売・廃棄マスター</h2>
 <p class=note>ジャンルごとの廃棄時刻と商品情報は、下のマスター画面から登録・変更します。</p>
 <div class=btns>
 <button class=sm onclick="openMasterFromSettings()">廃棄期限マスター</button>
 <button class="gh sm" onclick="openCatalogFromSettings()">品揃えマスター</button>
 </div>
+<div class=settingsAdvanced style="display:none">
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
 <div><label>日付</label><input id=tg_d placeholder="8/22"></div>
@@ -233,6 +237,7 @@
 </div>
 <p class=note id=ocrst>「📷 写真読取」で帳票や画面を撮影すると自動で文字解析されます。</p>
 <textarea id=out readonly></textarea>
+</div>
 <div class=btns style="margin-top:12px">
 <button class=gh onclick="document.getElementById('dSet').close()">閉じる</button>
 <button class="gh sm" id=wipeToggle onclick="showWipe()" style="opacity:.4">…</button>
