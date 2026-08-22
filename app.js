@@ -11,7 +11,7 @@ let DB=null, MODE='o', SORT=false, EDIT=null;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
-function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',g}}
+function fresh(){const g={};GEN.forEach(([k,n,i])=>{g[k]=blank(n,i);if(typeof SEED!=='undefined'&&SEED[k])Object.assign(g[k],SEED[k])});return{v:3,active:'onigiri',memoDisplay:true,g}}
 /* GENに定義された全カテゴリがDBに存在するよう補完する。
    クラウド読込や取り込みで古い構成のデータが入っても、新カテゴリが消えないようにする */
 function ensureCategories(){
@@ -68,6 +68,16 @@ function toggleSettingsAdvanced(){
   els.forEach(el=>el.style.display=show?'':'none');
   const b=$('settingsAdvancedBtn');
   if(b)b.textContent=show?'詳細設定を隠す':'詳細設定を表示';
+}
+function setMemoDisplay(on){
+  DB.memoDisplay=!!on;save();renderMemoDisplaySetting();renderMainMemos();
+}
+function renderMemoDisplaySetting(){
+  const on=DB.memoDisplay!==false;
+  const a=$('memoDisplayOn'),b=$('memoDisplayOff'),s=$('memoDisplayStatus');
+  if(a)a.setAttribute('aria-pressed',String(on));
+  if(b)b.setAttribute('aria-pressed',String(!on));
+  if(s)s.textContent=on?'現在：表示（次回起動後も表示）':'現在：非表示（次回起動後も非表示）';
 }
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
@@ -704,6 +714,7 @@ function renderHist(){const B=$('htb');B.textContent='';
     const x=c('');const b=document.createElement('button');b.className='gh sm';b.textContent='×';
     b.onclick=()=>{G().hist.splice(i,1);renderHist();autosave()};x.appendChild(b);
     B.appendChild(tr)})}
+function openHistoryList(){renderHist();$('dHistList').showModal()}
 
 function renderAll(){renderTabs();
   const g=G();$('dt').value=g.cur.dt||'';
@@ -917,7 +928,12 @@ function setMemoView(v){MEMO_VIEW=v;
   ['memoMonth','memoMonthMain'].forEach(id=>{if($(id))$(id).setAttribute('aria-pressed',String(v==='month'))});
   renderMemos();renderMainMemos()}
 function renderMemos(){renderMemoList($('memolist'))}
-function renderMainMemos(){renderMemoList($('mainMemolist'))}
+function renderMainMemos(){
+  const card=$('mainMemoCard');
+  const on=DB.memoDisplay!==false;
+  if(card)card.style.display=on?'':'none';
+  if(on)renderMemoList($('mainMemolist'));
+}
 function memoDisplayWindow(){
   /* 今年の予定日の約2週間前に、前年の同時期メモを先に表示する */
   const now=new Date();now.setHours(0,0,0,0);now.setDate(now.getDate()+14);
@@ -1047,7 +1063,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('s_shelf').value=g.shelf||'';$('s_cycle').value=g.cycle||'';$('s_binnote').value=g.binNote||'';
   $('loc_status').textContent='現在の地域: '+getLoc().name;
-  renderMemos();renderBinMx();
+  renderMemoDisplaySetting();renderMemos();renderBinMx();
   const sug=suggestBase();
   $('s_base_sug').textContent=sug?`実績平均(特殊カレンダー・当日除く、${sug.n}日分): ${sug.avg}個`:'実績データがまだ足りません';
   const L=learnDow();

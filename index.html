@@ -211,6 +211,12 @@
 <button class=sm onclick="openMasterFromSettings()">廃棄期限マスター</button>
 <button class="gh sm" onclick="openCatalogFromSettings()">品揃えマスター</button>
 </div>
+<h2 style="margin-top:14px">メモ表示</h2>
+<div class=btns>
+<button class=sm id=memoDisplayOn aria-pressed=true onclick="setMemoDisplay(true)">表示ON</button>
+<button class="gh sm" id=memoDisplayOff aria-pressed=false onclick="setMemoDisplay(false)">表示OFF</button>
+</div>
+<p class=note id=memoDisplayStatus></p>
 <div class=settingsAdvanced style="display:none">
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
@@ -221,11 +227,7 @@
 <div id=tglist class=note></div>
 <div id=setbody style="margin-top:12px"></div>
 <h2 style="margin-top:14px">履歴（実績データ）</h2>
-<div class=hscrollrow>
-<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',-1)">◀</button>
-<div class=hscroll id=htwrap style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
-<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
-</div>
+<div class=btns><button class=sm onclick="openHistoryList()">履歴一覧を表示</button></div>
 <p class=note>曜日係数の学習・週平均の提案に使われます。普段は見なくて大丈夫です。</p>
 <h2 style="margin-top:14px">書き出し・AI連携・カメラ取込</h2>
 <div class=btns>
@@ -245,6 +247,16 @@
 <button class=gh onclick="document.getElementById('dSet').close()">閉じる</button>
 <button class="gh sm" id=wipeToggle onclick="showWipe()" style="opacity:.4">…</button>
 <button class=gh id=wipeBtn style="color:var(--crit);display:none" onclick="wipe()">全部消す</button></div></dialog>
+
+<dialog id=dHistList>
+<h2>履歴一覧（実績データ）</h2>
+<div class=hscrollrow>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',-1)">◀</button>
+<div class=hscroll id=htwrap style="overflow-x:auto"><table><thead><tr><th class=l>日</th><th class=stoconai>ストコンAI</th><th>納品</th><th>販売</th><th>廃棄</th><th>消化率</th><th>便別納品</th><th></th></tr></thead><tbody id=htb></tbody></table></div>
+<button class="gh sm hsbtn" onclick="hscrollBy('htwrap',1)">▶</button>
+</div>
+<div class=btns style="margin-top:12px"><button class=gh onclick="document.getElementById('dHistList').close()">閉じる</button></div>
+</dialog>
 
 <dialog id=dMaster>
 <h2>廃棄期限マスター</h2>
