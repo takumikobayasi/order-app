@@ -1348,10 +1348,21 @@ function hscrollBy(id,dir){const el=$(id);if(!el)return;
 document.querySelectorAll('.hscroll').forEach(enableDragScroll);
 
 /* ---------- 起動 ---------- */
-['dt','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
-  G().cur.dt=$('dt').value;G().cur.wthr=$('wthr').value;
-  if(id==='dt'){applyDow();$('tq').value='';$('ta').value=''}
-  renderSetup();autosave()}));
+/* 日付欄は入力途中に現在データを上書きしない。
+   入力確定時に、変更前の日付を下書き保存してから切り替える。 */
+$('dt').addEventListener('input',()=>{applyDow();$('tq').value='';$('ta').value='';renderSetup()});
+$('dt').addEventListener('change',()=>{
+  const d=$('dt').value.trim();
+  if(!orderDateParts(d)){
+    $('dt').value=G().cur.dt||'';renderSetup();return;
+  }
+  if(d===G().cur.dt){renderSetup();return}
+  saveOrderDateDraft();
+  loadOrderDate(d);
+});
+$('wthr').addEventListener('input',()=>{
+  G().cur.wthr=$('wthr').value;renderSetup();autosave()
+});
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
   // 配信版が未選択なら、入力時刻から最新版を自動で選ぶ
