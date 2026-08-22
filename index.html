@@ -24,11 +24,7 @@
 <div class=card style="border:2px solid var(--s1)">
 <h2><span class=n>0</span>今日のセットアップ</h2>
 <div class=fg style="grid-template-columns:1fr 1fr">
-<div id=dateNav><label>納品日</label><div class=date-row>
-<button class="gh sm" onclick="shiftDeliveryDate(-1)" aria-label="前の日">◀</button>
-<input id=dt placeholder="8/21" autocomplete=off>
-<button class="gh sm" onclick="shiftDeliveryDate(1)" aria-label="次の日">▶</button>
-</div><p class="note" id=dayStatus></p><p class="note" id=prevYearNote></p><p class="note" id=daySaveStatus></p></div>
+<div><label>納品日</label><input id=dt placeholder="8/21"></div>
 <div><label>天気</label><div style="display:flex;gap:6px">
 <input id=wthr placeholder="晴 / 朝晴/昼曇/夕雨 など" style="flex:1">
 <button class="gh sm" style="flex:0 0 auto" onclick="fetchWeather()">🌤自動</button>
@@ -94,8 +90,6 @@
 </div>
 
 </div>
-
-<div id=saveSentinel class=save-sentinel>ここまで確認すると変更を保存します</div>
 
 <div class=foot>
 <button class="cloud" onclick="syncCloud()">☁️ 同期（保存して共有）</button>

@@ -8,7 +8,6 @@ const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
 let DB=null, MODE='o', SORT=false, EDIT=null;
-let DAY_DRAFTS={}, ACTIVE_DAY='', DAY_DIRTY=false, DAY_SWITCHING=false;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -36,7 +35,6 @@ function flash(t){$('st').textContent=t;
 let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
 function dlg(id){
-  if(DAY_DIRTY)flushDayDrafts(false);
   if(id==='dSet')renderSet();
   if(id==='dMaster'){
     const sel=$('bm_gen');if(sel&&sel.options.length)sel.value=DB.active;
@@ -139,7 +137,7 @@ async function fetchWeather(){
   const v=await weatherForDate(dateStr);
   if(!v){alert('天気の取得に失敗しました（通信環境、または対応範囲外の日付です）');flash('取得失敗');return}
   $('wthr').value=v;
-  G().cur.wthr=v;renderSetup();markDayDirty();
+  G().cur.wthr=v;renderSetup();autosave();
   flash('天気を取得しました');
 }
 
@@ -186,7 +184,7 @@ async function cloudSave(){
 
 /* 同期＝端末保存＋クラウド保存を1ボタンで。失敗時は端末保存のままにして後で再同期 */
 async function syncCloud(){
-  flushDayDrafts(false);save();
+  save();
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
   // 空データでクラウドを上書きしてしまう事故を防ぐ
@@ -424,7 +422,7 @@ function getAiAdoption(){
 function renderTabs(){const el=$('tabs');el.textContent='';
   GEN.forEach(([k,n,ic])=>{const g=DB.g[k];const b=document.createElement('button');
     b.className='tab';b.setAttribute('aria-selected',String(k===DB.active));
-    b.onclick=()=>{captureDayDraft();DB.active=k;ACTIVE_DAY=normDay(DB.g[k].cur.dt||'');save();DAY_DIRTY=false;
+    b.onclick=()=>{DB.active=k;save();
       const ms=$('bm_gen');if(ms)ms.value=k;
       renderAll();
       if($('dMaster')&&$('dMaster').open)renderBinMx()};
@@ -598,7 +596,7 @@ function renderItems(){
         inp.title=badUnit?`${r.unit}個単位です`:'';
         const nv=vv(r.id,MODE);
         t6.textContent=nv.reduce((a,c)=>a+(c||0),0)||'';
-        refreshSum();renderSetup();updateDayIndicators();markDayDirty()};
+        refreshSum();renderSetup();autosave()};
       // 狭い画面では見出し行を隠すため、各入力の上に便名を出す
       const bl=document.createElement('span');bl.className='bl';bl.textContent=binLabel(g,i,false,r);
       td.append(bl,inp);tr.appendChild(td)});
@@ -629,9 +627,9 @@ function toggleSort(){SORT=!SORT;$('sortb').textContent=SORT?'並べ替え：ON�
   $('sortb').setAttribute('aria-pressed',String(SORT));renderItems()}
 function setMode(m){MODE=m;['o','i'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
 function fillFrom(src){G().items.forEach(r=>{const v=vv(r.id,src);
-  if(v.some(x=>x!==null))v.forEach((x,i)=>setV(r.id,MODE,i,x))});paintTotals();markDayDirty();flash('コピーしました')}
+  if(v.some(x=>x!==null))v.forEach((x,i)=>setV(r.id,MODE,i,x))});paintTotals();autosave();flash('コピーしました')}
 function clearMode(){G().items.forEach(r=>{const c=G().cur.v[r.id];if(c)c[MODE]=[null,null,null]});
-  paintTotals();markDayDirty()}
+  paintTotals();autosave()}
 
 function renderHist(){const B=$('htb');B.textContent='';
   G().hist.forEach((h,i)=>{const tr=document.createElement('tr');
@@ -643,47 +641,14 @@ function renderHist(){const B=$('htb');B.textContent='';
     b.onclick=()=>{G().hist.splice(i,1);renderHist();autosave()};x.appendChild(b);
     B.appendChild(tr)})}
 
-function normDay(d){const m=(d||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);return m?`${+m[1]}/${+m[2]}`:''}
-function draftKey(d){return DB.active+'|'+(d||ACTIVE_DAY)}
-function dayStateFromScreen(){const g=G();return{dt:ACTIVE_DAY||normDay($('dt').value),wthr:$('wthr').value,ai:['ai1','ai2','ai3'].map(id=>$(id).value===''?null:Number($(id).value)),aiVer:$('aiver').value,
-  tq:$('tq').value,ta:$('ta').value,r:['r1','r2','r3'].map(id=>$(id).value),v:JSON.parse(JSON.stringify(g.cur.v||{}))}}
-function captureDayDraft(){if(!ACTIVE_DAY)return;const s=dayStateFromScreen();DAY_DRAFTS[draftKey()]=s;G().dayDrafts=G().dayDrafts||{};G().dayDrafts[ACTIVE_DAY]=s}
-function markDayDirty(){captureDayDraft();DAY_DIRTY=true;const s=$('daySaveStatus');if(s){s.className='note warn';s.textContent='未保存の変更あり'}}
-function histForDay(d,y){const Y=y??new Date().getFullYear();return G().hist.find(h=>normDay(h.d)===normDay(d)&&(h.y||new Date().getFullYear())===Y)||null}
-function dayHasOrder(){return G().items.some(r=>vv(r.id,'i').some(x=>x!=null))}
-function updateDayIndicators(){
-  const d=ACTIVE_DAY||normDay($('dt').value),h=histForDay(d),ordered=dayHasOrder();
-  const complete=!!h&&h.n!=null&&h.s!=null&&h.ha!=null,st=$('dayStatus');
-  if(st){st.className='note '+(ordered&&!complete?'day-incomplete':complete?'day-complete':'');st.textContent=ordered&&!complete?'⚠ 発注済み・結果未入力':complete?'✓ 結果入力済み':ordered?'発注入力あり':'発注未入力'}
-  const p=$('prevYearNote');if(!p)return;const ly=histForDay(d,new Date().getFullYear()-1);
-  if(ly&&ly.m){p.className='note prev-year-note';p.textContent=`📌 前年メモ：${ly.m}`}else{p.textContent='';p.className='note'}
-}
-function applyDayState(d,state){
-  const g=G(),target=g.tgt[d]||{};ACTIVE_DAY=d;G().cur={dt:d,wthr:state?.wthr||'',ai:state?.ai||[null,null,null],aiVer:state?.aiVer||'',v:state?.v||{}};
-  $('dt').value=d;$('wthr').value=G().cur.wthr;
-  const ai=G().cur.ai||[null,null,null];$('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
-  $('aiver').value=G().cur.aiVer||aiVersionNow().cur;
-  $('tq').value=state?.tq??(target.q??'');$('ta').value=state?.ta??(target.a??'');
-  applyDow();if(state?.r)state.r.forEach((v,i)=>$('r'+(i+1)).value=v);
-  renderItems();renderSetup();updateDayIndicators();const ss=$('daySaveStatus');if(ss){ss.className='note';ss.textContent=''}
-}
-function switchDeliveryDate(d){const next=normDay(d);if(!next||next===ACTIVE_DAY)return;captureDayDraft();
-  const stored=DAY_DRAFTS[draftKey(next)]||(G().dayDrafts&&G().dayDrafts[next]);applyDayState(next,stored||null)}
-function shiftDeliveryDate(dir){const m=($('dt').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);const n=new Date();const base=m?new Date(n.getFullYear(),+m[1]-1,+m[2]):new Date();base.setDate(base.getDate()+dir);switchDeliveryDate((base.getMonth()+1)+'/'+base.getDate())}
-function flushDayDrafts(show){if(!DAY_DIRTY)return false;captureDayDraft();DAY_DIRTY=false;save();const ss=$('daySaveStatus');if(ss){ss.className='note day-complete';ss.textContent='保存済み ✓'}return true}
-function setupDaySaveGuards(){
-  const sentinel=$('saveSentinel');if('IntersectionObserver' in window&&sentinel)new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting))flushDayDrafts(true)}).observe(sentinel);
-  const leave=()=>flushDayDrafts(false);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')leave()});window.addEventListener('pagehide',leave);window.addEventListener('beforeunload',leave);
-  const nav=$('dateNav');if(nav){let sx=0;nav.addEventListener('touchstart',e=>{sx=e.changedTouches[0].clientX},{passive:true});nav.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>45)shiftDeliveryDate(dx<0?1:-1)},{passive:true})}
-}
 function renderAll(){renderTabs();
-  const g=G();ACTIVE_DAY=normDay(g.cur.dt||ACTIVE_DAY);$('dt').value=ACTIVE_DAY||g.cur.dt||'';
+  const g=G();$('dt').value=g.cur.dt||'';
   $('wthr').value=g.cur.wthr||'';
   const ai=g.cur.ai||[null,null,null];
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
   // 未選択なら今の時刻から最新の配信版を初期表示する（表示と選択のズレを防ぐ）
   $('aiver').value=g.cur.aiVer||aiVersionNow().cur;
-  applyDow();renderItems();renderHist();renderSetup();renderWeekly();updateDayIndicators()}
+  applyDow();renderItems();renderHist();renderSetup();renderWeekly()}
 
 /* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
 function wasteFactor(r){
@@ -779,7 +744,7 @@ function alloc(){
   detailed.forEach(r=>setAll(r.id,vv(r.id,'i').map((x,i)=>itemBins(r,g).includes(i)?(x||0):0)));   // 対象外便は0
   g.items.forEach(r=>{if(!(r.id in q)&&!hasDetail(r))setAll(r.id,[0,0,0])});
 
-  MODE='o';setMode('o');paintTotals();markDayDirty();
+  MODE='o';setMode('o');paintTotals();autosave();
   const s=sums('o');
   $('allocnote').className='note ok';
   $('allocnote').textContent=`${s.T}個 / ${s.amt.toLocaleString()}円　便別${R.join('/')}%`
@@ -819,7 +784,7 @@ function catInput(type,value,field,ix){const e=document.createElement('input');e
 function catSelect(options,value,field,ix){const e=document.createElement('select');options.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;e.appendChild(o)});e.value=value==null?'':String(value);e.dataset.cat=field;e.dataset.ix=ix;return e}
 function catBins(r,g,ix){const box=document.createElement('div');box.className='cat-bins';const a=itemBins(r,g);
   [0,1,2].forEach(i=>{const lab=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=a.includes(i);cb.dataset.cat='bin'+i;cb.dataset.ix=ix;lab.append(cb,document.createTextNode((i+1)+'便'));box.appendChild(lab)});return box}
-function openCatalog(){if(DAY_DIRTY)flushDayDrafts(false);renderCatalog();$('dCatalog').showModal()}
+function openCatalog(){renderCatalog();$('dCatalog').showModal()}
 function renderCatalog(){
   const g=G();$('catTitle').textContent=g.name;const tb=$('catbody');tb.textContent='';
   if(!g.items.length){$('catmsg').textContent='商品がありません。「＋商品」から登録してください。';return}
@@ -847,7 +812,6 @@ function delItem(){if(EDIT==null){$('dItem').close();return}
 
 /* ---------- 履歴・目標 ---------- */
 function openHist(){
-  if(DAY_DIRTY)flushDayDrafts(false);
   const t=new Date(Date.now()-86400000); // 前日から開始
   loadHistDate((t.getMonth()+1)+'/'+t.getDate());
   $('dHist').showModal()}
@@ -1340,15 +1304,16 @@ function hscrollBy(id,dir){const el=$(id);if(!el)return;
 document.querySelectorAll('.hscroll').forEach(enableDragScroll);
 
 /* ---------- 起動 ---------- */
-$('dt').addEventListener('change',()=>switchDeliveryDate($('dt').value));
-$('wthr').addEventListener('input',()=>{G().cur.wthr=$('wthr').value;renderSetup();updateDayIndicators();markDayDirty()});
+['dt','wthr'].forEach(id=>$(id).addEventListener('input',()=>{
+  G().cur.dt=$('dt').value;G().cur.wthr=$('wthr').value;
+  if(id==='dt'){applyDow();$('tq').value='';$('ta').value=''}
+  renderSetup();autosave()}));
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
   // 配信版が未選択なら、入力時刻から最新版を自動で選ぶ
   if(!$('aiver').value){$('aiver').value=aiVersionNow().cur;G().cur.aiVer=$('aiver').value}
-  renderSetup();markDayDirty()}));
-$('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;renderSetup();markDayDirty()});
-['tq','ta','r1','r2','r3'].forEach(id=>$(id).addEventListener('input',()=>{renderSetup();markDayDirty()}));
+  renderSetup();autosave()}));
+$('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;renderSetup();autosave()});
 if(!load())DB=fresh();
 if(!DB.g)DB=fresh();
 /* 保存データが空(商品0件かつ履歴0件)なら初期データから復旧する。
@@ -1359,5 +1324,5 @@ if(!DB.g)DB=fresh();
   if(items===0&&hist===0)DB=fresh();
 })();
 ensureCategories();
-renderAll();setupDaySaveGuards();save();
+renderAll();save();
 cloudLoadSilent();
