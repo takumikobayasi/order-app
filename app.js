@@ -547,7 +547,9 @@ function renderSetup(){
   const m=$('setupmsg');
   if(!i){m.className='note warn';m.textContent='▲ 納品日を入れると曜日係数と便構成比が入ります'}
   else if(!s.T){m.className='note warn';m.textContent='▲ 目標を入れて「配分」を押してください'}
-  else{m.className='note ok';m.textContent='✓ 準備できています'}}
+  else{m.className='note ok';m.textContent='✓ 準備できています'}
+  showMainLastYearNote($('dt').value);
+}
 
 function renderItems(){
   const g=G();
@@ -960,6 +962,18 @@ function showLastYearNote(d){
   if(only.length)lines.push(`【去年の同じ月・その他】${only.join(' ／ ')}`);
   if(lines.length){el.className='note ok';el.textContent='📌 '+lines.join('　')}
   else{el.className='note';el.textContent=`去年（${ly}年）の${mo}月にはメモがありません`}
+}
+/* テスト表示：メイン画面にも前年の同日メモを表示する */
+function showMainLastYearNote(d){
+  const el=$('mainLastYearNote');if(!el)return;
+  el.textContent='';el.style.display='none';
+  const m=(d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
+  const Y=new Date().getFullYear(),ly=Y-1,key=+m[1]+'/'+ +m[2];
+  const notes=(G().hist||[]).filter(h=>(h.y||Y)===ly&&h.d===key&&h.m).map(h=>h.m);
+  if(!notes.length)return;
+  el.className='note ok';
+  el.textContent='📌 前年メモ（テスト表示）：'+notes.join(' ／ ');
+  el.style.display='block';
 }
 function shiftHistDate(dir){
   saveHistDateDraft();
