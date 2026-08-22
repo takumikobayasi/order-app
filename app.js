@@ -35,6 +35,7 @@ function flash(t){$('st').textContent=t;
 let sT=null;const autosave=()=>{clearTimeout(sT);sT=setTimeout(save,400)};
 const G=()=>DB.g[DB.active];
 function dlg(id){
+  saveOrderDateDraft();save();
   if(id==='dSet')renderSet();
   if(id==='dMaster'){
     const sel=$('bm_gen');if(sel&&sel.options.length)sel.value=DB.active;
@@ -124,13 +125,9 @@ async function weatherForDate(dateStr){
   return null}
 
 async function fetchWeather(){
+  setActionOrderDate();
   const loc=getLoc();
   if(!loc){alert('先に「設定」から地域を登録してください');dlg('dSet');return}
-  if(!$('dt').value.trim()){
-    const tmr=new Date(Date.now()+86400000);
-    $('dt').value=(tmr.getMonth()+1)+'/'+tmr.getDate();
-    G().cur.dt=$('dt').value;applyDow();$('tq').value='';$('ta').value='';
-  }
   const dateStr=ymdOf($('dt').value);
   if(!dateStr){alert('納品日を「8/21」のように入力してください');return}
   flash('天気を取得中...');
@@ -184,6 +181,7 @@ async function cloudSave(){
 
 /* 同期＝端末保存＋クラウド保存を1ボタンで。失敗時は端末保存のままにして後で再同期 */
 async function syncCloud(){
+  setActionOrderDate();
   save();
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
@@ -389,6 +387,52 @@ function applyDow(){const i=dowInfo();if(!i)return null;
     $('rw'+n).style.display=use?'':'none';
     if(!use)$('r'+n).value=0});
   return i}
+/* 納品日ごとの入力途中データ。日付移動では確定履歴にせず、
+   カテゴリ内の下書きとして保持する。 */
+function orderDateParts(d){
+  const m=(d||'').trim().match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);
+  return m?{mo:+m[1],da:+m[2]}:null
+}
+function orderDateText(date){return (date.getMonth()+1)+'/'+date.getDate()}
+function cloneOrderState(v){return JSON.parse(JSON.stringify(v||{}))}
+function saveOrderDateDraft(){
+  const g=G(),d=(g.cur.dt||$('dt').value||'').trim();
+  if(!orderDateParts(d))return;
+  g.dateDrafts=g.dateDrafts||{};
+  g.dateDrafts[d]={v:cloneOrderState(g.cur.v),wthr:g.cur.wthr||'',
+    ai:Array.isArray(g.cur.ai)?g.cur.ai.slice():[null,null,null],aiVer:g.cur.aiVer||''};
+}
+function loadOrderDate(d){
+  const g=G();if(!orderDateParts(d))return;
+  g.dateDrafts=g.dateDrafts||{};
+  const old=g.dateDrafts[d];
+  g.cur.dt=d;
+  g.cur.v=old?cloneOrderState(old.v):{};
+  g.cur.wthr=old?old.wthr:'';
+  g.cur.ai=old&&Array.isArray(old.ai)?old.ai.slice():[null,null,null];
+  g.cur.aiVer=old?old.aiVer:'';
+  $('tq').value='';$('ta').value='';
+  renderAll();
+  autosave();
+}
+function shiftOrderDate(dir){
+  const p=orderDateParts($('dt').value)||orderDateParts(G().cur.dt);
+  const now=new Date(),base=p?new Date(now.getFullYear(),p.mo-1,p.da):new Date();
+  saveOrderDateDraft();
+  base.setDate(base.getDate()+dir);
+  loadOrderDate(orderDateText(base));
+}
+/* 同期・天気取得を押した時の業務日付。
+   15:00までは当日、15:00以降は翌日を対象にする。 */
+function setActionOrderDate(){
+  const d=new Date();
+  if(d.getHours()>=15)d.setDate(d.getDate()+1);
+  const target=orderDateText(d);
+  if(($('dt').value||'').trim()===target&&G().cur.dt===target)return target;
+  saveOrderDateDraft();
+  loadOrderDate(target);
+  return target;
+}
 function tgtKey(){const m=($('dt').value||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);return m?(+m[1]+'/'+ +m[2]):null}
 
 /* ---------- 集計・AI採用率 ---------- */
@@ -422,7 +466,7 @@ function getAiAdoption(){
 function renderTabs(){const el=$('tabs');el.textContent='';
   GEN.forEach(([k,n,ic])=>{const g=DB.g[k];const b=document.createElement('button');
     b.className='tab';b.setAttribute('aria-selected',String(k===DB.active));
-    b.onclick=()=>{DB.active=k;save();
+    b.onclick=()=>{saveOrderDateDraft();save();DB.active=k;
       const ms=$('bm_gen');if(ms)ms.value=k;
       renderAll();
       if($('dMaster')&&$('dMaster').open)renderBinMx()};
@@ -1326,3 +1370,10 @@ if(!DB.g)DB=fresh();
 ensureCategories();
 renderAll();save();
 cloudLoadSilent();
+
+/* 画面離脱・バックグラウンド移行時の保存漏れ防止。
+   クラウド送信ではなく、まず端末の最新状態を同期的に保存する。 */
+function saveBeforeLeave(){saveOrderDateDraft();save()}
+window.addEventListener('pagehide',saveBeforeLeave);
+window.addEventListener('beforeunload',saveBeforeLeave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveBeforeLeave()});
