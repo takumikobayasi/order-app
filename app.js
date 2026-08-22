@@ -46,6 +46,10 @@ function openMasterFromSettings(){
   $('dSet').close();
   dlg('dMaster');
 }
+function openCatalogFromSettings(){
+  $('dSet').close();
+  openCatalog();
+}
 function toggleTheme(){const r=document.documentElement;
   r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark')}
 

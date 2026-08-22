@@ -9,7 +9,6 @@
 <div class=hbar>
 <h1 id=title>発注アプリ</h1>
 <button class="gh sm" onclick="toggleTheme()">◐</button>
-<button class="gh sm" onclick="dlg('dMaster')">廃棄期限マスター</button>
 <button class="gh sm" onclick="dlg('dSet')">設定</button>
 </div>
 <div class=hscrollrow>
@@ -193,8 +192,11 @@
 <p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 <h2 style="margin-top:14px">販売・廃棄マスター</h2>
-<p class=note>ジャンルごとの廃棄時刻は、画面上部の「廃棄期限マスター」から登録します。</p>
-<div class=btns><button class=sm onclick="openMasterFromSettings()">廃棄期限マスターを開く</button></div>
+<p class=note>ジャンルごとの廃棄時刻と商品情報は、下のマスター画面から登録・変更します。</p>
+<div class=btns>
+<button class=sm onclick="openMasterFromSettings()">廃棄期限マスター</button>
+<button class="gh sm" onclick="openCatalogFromSettings()">品揃えマスター</button>
+</div>
 <h2 style="margin-top:14px">目標値</h2>
 <div class="fg g3">
 <div><label>日付</label><input id=tg_d placeholder="8/22"></div>
