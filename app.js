@@ -24,25 +24,16 @@ function ensureCategories(){
   });
   if(!DB.g[DB.active])DB.active=GEN[0][0];
 }
-/* TEMP: メモの週別/月別表示を確認するための試験データ。次回更新で削除予定。 */
-function seedMemoDisplayTest(){
-  if(DB.memoDisplayTestV1)return;
-  const g=DB.g&&DB.g.onigiri;if(!g)return;
-  const y=new Date().getFullYear();
-  const samples=[
-    ['8/2','【テスト】月初の日曜。朝の動きを確認'],
-    ['8/6','【テスト】雨で来店が少なめ'],
-    ['8/9','【テスト】週末で昼の販売が強め'],
-    ['8/13','【テスト】お盆休み。自分も休みで通常と違う動き'],
-    ['8/14','【テスト】お盆休み。帰省客の影響を確認'],
-    ['8/16','【テスト】お盆休み最終日'],
-    ['8/21','【テスト】週末前の発注を確認']
-  ];
-  samples.forEach(([d,m])=>{
-    if(!g.hist.some(h=>h.d===d&&(h.y||y)===y))g.hist.push({d,y,m});
+/* 一時的に追加したメモ表示テストデータを削除する。 */
+function cleanMemoDisplayTest(){
+  let changed=false;
+  Object.values(DB.g||{}).forEach(g=>{
+    const before=(g.hist||[]).length;
+    g.hist=(g.hist||[]).filter(h=>!String(h.m||'').startsWith('【テスト】'));
+    if(g.hist.length!==before)changed=true;
   });
-  g.hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
-  DB.memoDisplayTestV1=true;save();
+  if(DB.memoDisplayTestV1!==undefined){delete DB.memoDisplayTestV1;changed=true}
+  if(changed)save();
 }
 function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
   return false}
@@ -568,7 +559,6 @@ function renderSetup(){
   if(!i){m.className='note warn';m.textContent='▲ 納品日を入れると曜日係数と便構成比が入ります'}
   else if(!s.T){m.className='note warn';m.textContent='▲ 目標を入れて「配分」を押してください'}
   else{m.className='note ok';m.textContent='✓ 準備できています'}
-  showMainLastYearNote($('dt').value);
   renderMainMemos();
 }
 
@@ -928,11 +918,31 @@ function setMemoView(v){MEMO_VIEW=v;
   renderMemos();renderMainMemos()}
 function renderMemos(){renderMemoList($('memolist'))}
 function renderMainMemos(){renderMemoList($('mainMemolist'))}
+function memoDisplayWindow(){
+  /* 今年の予定日の約2週間前に、前年の同時期メモを先に表示する */
+  const now=new Date();now.setHours(0,0,0,0);now.setDate(now.getDate()+14);
+  const target=new Date(now.getFullYear()-1,now.getMonth(),now.getDate());
+  if(MEMO_VIEW==='month'){
+    return{start:new Date(target.getFullYear(),target.getMonth(),1),end:new Date(target.getFullYear(),target.getMonth()+1,1)};
+  }
+  const start=new Date(target);start.setDate(start.getDate()-13);
+  const end=new Date(target);end.setDate(end.getDate()+1);
+  return{start,end};
+}
 function renderMemoList(el){
   if(!el)return;el.textContent='';
-  const Y=new Date().getFullYear(),groups={};
-  (G().hist||[]).forEach(h=>{
+  const Y=new Date().getFullYear(),groups={},win=memoDisplayWindow();
+  const records=(G().hist||[]).filter(h=>{
     if(!h.m)return;
+    const m=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
+    const y=h.y||Y;
+    const date=new Date(y,+m[1]-1,+m[2]);
+    return date>=win.start&&date<win.end;
+  }).sort((a,b)=>{
+    const pa=(a.d||'').match(/(\d+)\D+(\d+)/),pb=(b.d||'').match(/(\d+)\D+(\d+)/);
+    return pa&&pb?(+(a.y||Y)*10000+ +pa[1]*100+ +pa[2])-(+(b.y||Y)*10000+ +pb[1]*100+ +pb[2]):0;
+  });
+  records.forEach(h=>{
     const m=(h.d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
     const y=h.y||Y;
     const key=MEMO_VIEW==='month'
@@ -949,7 +959,7 @@ function renderMemoList(el){
     const md=k.match(/(\d{1,2})月/)||k.match(/(\d{1,2})\/(\d{1,2})/);
     const mo=md?+md[1]:0, da=md&&md[2]?+md[2]:0;
     return mo*10000+da*100+(9999-+y)};
-  keys.sort((a,b)=>sortKey(b)-sortKey(a)).forEach(k=>{
+  keys.sort((a,b)=>sortKey(a)-sortKey(b)).forEach(k=>{
     const w=document.createElement('div');w.className='row';
     const a=document.createElement('div');a.className='k';a.textContent=k;
     const b=document.createElement('div');b.className='v';b.textContent=groups[k].join(' ／ ');
@@ -985,23 +995,6 @@ function showLastYearNote(d){
   if(only.length)lines.push(`【去年の同じ月・その他】${only.join(' ／ ')}`);
   if(lines.length){el.className='note ok';el.textContent='📌 '+lines.join('　')}
   else{el.className='note';el.textContent=`去年（${ly}年）の${mo}月にはメモがありません`}
-}
-/* テスト表示：メイン画面にも前年の同日メモを表示する */
-function showMainLastYearNote(d){
-  const el=$('mainLastYearNote');if(!el)return;
-  el.textContent='';el.style.display='none';
-  const m=(d||'').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/);if(!m)return;
-  const Y=new Date().getFullYear(),ly=Y-1,key=+m[1]+'/'+ +m[2];
-  let notes=(G().hist||[]).filter(h=>(h.y||Y)===ly&&h.d===key&&h.m).map(h=>h.m);
-  let label='前年メモ（テスト表示）';
-  if(!notes.length){
-    notes=(G().hist||[]).filter(h=>(h.y||Y)===Y&&h.d===key&&h.m).map(h=>h.m);
-    label='今回のメモ（テスト表示）';
-  }
-  if(!notes.length)return;
-  el.className='note ok';
-  el.textContent='📌 '+label+'：'+notes.join(' ／ ');
-  el.style.display='block';
 }
 function shiftHistDate(dir){
   saveHistDateDraft();
@@ -1442,7 +1435,7 @@ if(!DB.g)DB=fresh();
   if(items===0&&hist===0)DB=fresh();
 })();
 ensureCategories();
-seedMemoDisplayTest();
+cleanMemoDisplayTest();
 renderAll();save();
 cloudLoadSilent();
 
