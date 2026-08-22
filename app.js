@@ -497,7 +497,7 @@ function renderSetup(){
 
 function renderItems(){
   const g=G();
-  const H=$('ith');H.textContent='';
+  const H=$('ith');H.textContent='';H.className=SORT?'sortmode':'';
   const hr=document.createElement('tr');
   const showOther=!SORT;
   const BINS=binsUsed(g);                       // マスタに登録のある便だけ表示する
