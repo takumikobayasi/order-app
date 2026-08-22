@@ -604,7 +604,7 @@ function renderItems(){
       t7.textContent=oth.map(m=>{const x=vv(r.id,m).reduce((a,c)=>a+(c||0),0);return x||'-'}).join('/');
       tr.appendChild(t7)}
     B.appendChild(tr)});
-  B.className='bins'+BINS.length;
+  B.className='bins'+BINS.length+(SORT?' sortmode':'');
   addSum(BINS)}
 function refreshSum(){
   const old=$('itb').querySelector('tr.sum');

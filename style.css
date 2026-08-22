@@ -110,6 +110,16 @@ padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;
   #itb.bins1 tr.sum{grid-template-columns:1fr 1fr}
   #itb tr.sum td:first-child{grid-column:1/-1;margin-bottom:2px}
   #itb tr.sum td:nth-child(2){display:none}
+
+  /* 並べ替え中は移動ボタンを商品行の左側に置き、商品名が縦に潰れないようにする */
+  #itb.sortmode tr{grid-template-columns:50px minmax(70px,1fr) 26px repeat(3,minmax(34px,1fr)) 30px}
+  #itb.sortmode tr td:first-child{grid-column:auto;margin-bottom:0}
+  #itb.sortmode .mv{min-width:0;gap:3px}
+  #itb.sortmode .mv button{width:100%;padding:6px 1px;font-size:10px;overflow:hidden}
+  #itb.sortmode .nmcell{grid-column:auto;max-width:none}
+  #itb.sortmode .nm1-name{white-space:normal;overflow:visible;text-overflow:clip}
+  #itb.sortmode tr.sum{grid-template-columns:50px minmax(70px,1fr) 26px repeat(3,minmax(34px,1fr)) 30px}
+  #itb.sortmode tr.sum td:first-child{grid-column:auto;margin-bottom:0}
 }
 @media (max-width:380px){
   .gr{width:18px;height:18px;line-height:18px;font-size:10px}
