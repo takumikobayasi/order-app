@@ -517,9 +517,11 @@ function renderItems(){
     const tr=document.createElement('tr');
     if(SORT){
       const t0=document.createElement('td');const w=document.createElement('div');w.className='mv';
-      const up=document.createElement('button');up.className='gh';up.textContent='▲';
-      up.onclick=()=>mv(ix,-1);const dn=document.createElement('button');dn.className='gh';dn.textContent='▼';
-      dn.onclick=()=>mv(ix,1);w.append(up,dn);t0.appendChild(w);tr.appendChild(t0)}
+      const up=document.createElement('button');up.className='gh';up.textContent='↑ 上へ';up.title='この商品を1つ上へ移動';
+      up.disabled=ix===0;up.onclick=()=>mv(ix,-1);
+      const dn=document.createElement('button');dn.className='gh';dn.textContent='↓ 下へ';dn.title='この商品を1つ下へ移動';
+      dn.disabled=ix===g.items.length-1;dn.onclick=()=>mv(ix,1);
+      w.append(up,dn);t0.appendChild(w);tr.appendChild(t0)}
     const t1=document.createElement('td');t1.className='l nmcell';
     const n1=document.createElement('div');n1.className='nm1';
     if(r.tag){
@@ -619,7 +621,7 @@ function addSum(BINS){const s=sums(MODE),tr=document.createElement('tr');tr.clas
 function paintTotals(){renderItems();renderSetup()}
 function mv(i,d){const a=G().items;const j=i+d;if(j<0||j>=a.length)return;
   [a[i],a[j]]=[a[j],a[i]];renderItems();autosave()}
-function toggleSort(){SORT=!SORT;$('sortb').textContent='並べ替え：'+(SORT?'ON':'OFF');
+function toggleSort(){SORT=!SORT;$('sortb').textContent=SORT?'並べ替え：ON（上下ボタン）':'並べ替え：OFF';
   $('sortb').setAttribute('aria-pressed',String(SORT));renderItems()}
 function setMode(m){MODE=m;['o','i'].forEach(k=>$('m_'+k).setAttribute('aria-pressed',String(k===m)));renderItems()}
 function toggleLockOverride(){LOCK_OVERRIDE=!LOCK_OVERRIDE;
