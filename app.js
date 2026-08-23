@@ -2,6 +2,7 @@ const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
 const DEFAULT_LOC={lat:36.1214,lon:139.6015,name:'加須市(埼玉県)'};
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwU6-Ut_7ChPXtVr5fOEq5iPd7m0G5VNkcMJ8g27XQ_aBv2t0S-WUJNtmtoUYDqyZ4V/exec';
+const PREVIOUS_GAS_URL = 'https://script.google.com/macros/s/AKfycbypnSUGdcjGtZIDdnKXZ5jCkmJ-G0wjjVBb8An-Chqyp-PDXXjoDEwTLVXdY36w2m74/exec';
 const LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
 
 
@@ -211,7 +212,7 @@ async function autoHistWeather(d,force){
 /* ---------- クラウド同期 (CORS完全回避版) ---------- */
 function getGasUrl(){
   const saved=localStorage.getItem(GAS_KEY);
-  return !saved||saved===LEGACY_GAS_URL?DEFAULT_GAS_URL:saved;
+  return !saved||saved===LEGACY_GAS_URL||saved===PREVIOUS_GAS_URL?DEFAULT_GAS_URL:saved;
 }
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
 
