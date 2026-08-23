@@ -104,13 +104,13 @@
 <h2>今月の資料をGoogle Driveへ保存</h2>
 <div class="fg g2">
 <div><label>対象月</label><input id=driveMonth type=month></div>
-<div><label>分類はファイルごとに選択</label><span class=note>月曜・火曜・廃棄・発注・未分類</span></div>
+<div><label>保存先</label><span class=note>対象月の「未仕分け」フォルダへ保存</span></div>
 </div>
 <label class="btn-label sm" for=driveFiles>画像・PDFを選択</label>
 <input id=driveFiles type=file accept="image/*,.pdf,application/pdf" multiple hidden>
 <div id=driveFileList class=drive-file-list></div>
 <div class=btns style="margin-top:8px"><button class=sm id=driveUploadBtn onclick="uploadDriveFiles()">Google Driveへ保存</button></div>
-<p class=note id=driveMsg>選択したファイルは、GAS更新後にGoogle Driveの月別・分類別フォルダへ保存されます。</p>
+<p class=note id=driveMsg>選択したファイルは、GAS更新後にGoogle Driveの月別「未仕分け」フォルダへ保存されます。</p>
 </div>
 <div class=card>
 <h2>カメラ取り込み（写真→AI→貼り付け）</h2>
@@ -303,5 +303,5 @@
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
 <script src="data.js?v=20260822unlock1"></script>
-<script src="app.js?v=2026082406"></script>
+<script src="app.js?v=2026082407"></script>
 </body></html>

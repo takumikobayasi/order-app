@@ -1281,22 +1281,6 @@ function wipe(){if(!confirm('この端末のデータを全部消します。よ
   localStorage.removeItem(KEY);location.hash='';location.reload()}
 
 /* ---------- 週次データ取り込み（写真→AI→貼り付け） ---------- */
-const DRIVE_CATEGORIES=[
-  ['mon_timeseries','月曜・時系列グラフ'],
-  ['tue_assortment','火曜・品揃え'],
-  ['waste','廃棄集計'],
-  ['order_progress','発注進捗'],
-  ['unclassified','未分類']
-];
-function driveCategoryOptions(selected){return DRIVE_CATEGORIES.map(([v,n])=>`<option value="${v}"${v===selected?' selected':''}>${n}</option>`).join('')}
-function guessDriveCategory(name){
-  const s=String(name||'');
-  if(/月曜|時系列|推移/.test(s))return'mon_timeseries';
-  if(/火曜|品揃え|修正/.test(s))return'tue_assortment';
-  if(/廃棄|原価/.test(s))return'waste';
-  if(/発注|進捗/.test(s))return'order_progress';
-  return'unclassified';
-}
 function driveFileKey(file){
   return [file.name,file.size,file.lastModified,file.type].join('|');
 }
@@ -1306,11 +1290,9 @@ function renderDriveFiles(){
   DRIVE_FILES.forEach((entry,i)=>{
     const row=document.createElement('div');row.className='drive-file-row';
     const name=document.createElement('span');name.textContent=entry.file.name;name.title=entry.file.name;
-    const sel=document.createElement('select');sel.innerHTML=driveCategoryOptions(entry.category);
-    sel.onchange=()=>{entry.category=sel.value};
     const del=document.createElement('button');del.className='gh sm';del.textContent='×';del.title='選択から外す';
     del.onclick=()=>{DRIVE_FILES.splice(i,1);renderDriveFiles()};
-    row.append(name,sel,del);el.appendChild(row);
+    row.append(name,del);el.appendChild(row);
   });
 }
 function addDriveFiles(files){
@@ -1319,7 +1301,7 @@ function addDriveFiles(files){
     const key=driveFileKey(file);
     if(existing.has(key))return;
     existing.add(key);
-    DRIVE_FILES.push({file,category:guessDriveCategory(file.name)});
+    DRIVE_FILES.push({file,category:'unclassified'});
   });
   renderDriveFiles();
 }
@@ -1340,7 +1322,7 @@ async function uploadDriveFiles(){
       msg.textContent=`送信中 ${done+1}/${DRIVE_FILES.length}：${entry.file.name}`;
       const data=bytesToBase64(await entry.file.arrayBuffer());
       await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
-        mode:'upload',month,category:entry.category,name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data
+        mode:'upload',month,category:'unclassified',name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data
       })});
       done++;
     }
