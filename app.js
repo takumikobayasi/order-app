@@ -611,12 +611,8 @@ function renderItems(){
     pager.hidden=!desktop||g.items.length<=ITEMS_PER_PAGE;
     pager.textContent='';
     if(!pager.hidden){
-      const prev=document.createElement('button');prev.className='gh sm';prev.textContent='◀ 前へ';
-      prev.disabled=ITEM_PAGE===0;prev.onclick=()=>gotoItemPage(ITEM_PAGE-1);
       const label=document.createElement('span');label.textContent=`${pageStart+1}〜${Math.min(pageStart+ITEMS_PER_PAGE,g.items.length)}品 / ${g.items.length}品`;
-      const next=document.createElement('button');next.className='gh sm';next.textContent='次へ ▶';
-      next.disabled=ITEM_PAGE>=pageCount-1;next.onclick=()=>gotoItemPage(ITEM_PAGE+1);
-      pager.append(prev,label,next);
+      pager.append(label);
     }
   }
   const H=$('ith');H.textContent='';H.className=SORT?'sortmode':'';
@@ -732,6 +728,13 @@ function gotoItemPage(page){
   const count=Math.max(1,Math.ceil(G().items.length/ITEMS_PER_PAGE));
   ITEM_PAGE=Math.max(0,Math.min(page,count-1));
   renderItems();
+}
+function itemNavBy(dir){
+  if(window.matchMedia('(min-width:768px)').matches&&G().items.length>ITEMS_PER_PAGE){
+    gotoItemPage(ITEM_PAGE+dir);
+  }else{
+    hscrollBy('itwrap',dir);
+  }
 }
 function refreshSum(){
   const old=$('itb').querySelector('tr.sum');

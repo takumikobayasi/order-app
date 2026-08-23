@@ -84,9 +84,9 @@
 </div>
 <div id=itemPager class=item-pager hidden></div>
 <div class=hscrollrow>
-<button class="gh sm hsbtn" onclick="hscrollBy('itwrap',-1)">◀</button>
+<button class="gh sm hsbtn" onclick="itemNavBy(-1)" aria-label="前へ">◀</button>
 <div class=hscroll id=itwrap style="overflow-x:auto"><table><thead id=ith></thead><tbody id=itb></tbody></table></div>
-<button class="gh sm hsbtn" onclick="hscrollBy('itwrap',1)">▶</button>
+<button class="gh sm hsbtn" onclick="itemNavBy(1)" aria-label="次へ">▶</button>
 </div>
 </div>
 
@@ -291,5 +291,5 @@
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
 <script src="data.js?v=20260822unlock1"></script>
-<script src="app.js?v=2026082402"></script>
+<script src="app.js?v=2026082403"></script>
 </body></html>
