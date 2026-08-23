@@ -1318,14 +1318,18 @@ async function uploadDriveFiles(){
   if(!DRIVE_FILES.length){alert('画像またはPDFを選択してください');return}
   const btn=$('driveUploadBtn'),msg=$('driveMsg');btn.disabled=true;
   let done=0;
+  const pending=[...DRIVE_FILES];
   try{
-    for(const entry of DRIVE_FILES){
-      msg.textContent=`送信中 ${done+1}/${DRIVE_FILES.length}：${entry.file.name}`;
+    for(const entry of pending){
+      msg.textContent=`送信中 ${done+1}/${pending.length}：${entry.file.name}`;
       const data=bytesToBase64(await entry.file.arrayBuffer());
       await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
         mode:'upload',month,category:'unclassified',name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data
       })});
       done++;
+      const index=DRIVE_FILES.indexOf(entry);
+      if(index>=0)DRIVE_FILES.splice(index,1);
+      renderDriveFiles();
     }
     msg.className='note ok';msg.textContent=`✓ ${done}件を送信しました。Drive側で保存を確認してください。`;
   }catch(e){msg.className='note crit';msg.textContent=`⚠ ${done}件送信後に停止しました。通信を確認して再実行してください。`}
