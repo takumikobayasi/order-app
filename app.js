@@ -7,7 +7,7 @@ const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK4
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
-let DB=null, MODE='o', SORT=false, EDIT=null;
+let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri';
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -508,18 +508,27 @@ function getAiAdoption(){
 }
 
 /* ---------- 描画 ---------- */
+function selectAppTab(tab){
+  APP_TAB=tab;
+  const panels={onigiri:'panelOnigiri',progress:'panelProgress',camera:'panelCamera'};
+  Object.entries(panels).forEach(([key,id])=>{
+    const el=$(id);if(el)el.hidden=key!==tab;
+  });
+  document.querySelectorAll('#tabs .tab').forEach(b=>
+    b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
+  $('title').textContent=tab==='onigiri'?'🍙 おむすび 発注':tab==='progress'?'発注進捗確認':'📷 カメラ取り込み';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 function renderTabs(){const el=$('tabs');el.textContent='';
-  GEN.forEach(([k,n,ic])=>{const g=DB.g[k];const b=document.createElement('button');
-    b.className='tab';b.setAttribute('aria-selected',String(k===DB.active));
-    b.onclick=()=>{saveOrderDateDraft();save();DB.active=k;
-      const ms=$('bm_gen');if(ms)ms.value=k;
-      renderAll();
-      if($('dMaster')&&$('dMaster').open)renderBinMx()};
+  [['onigiri','🍙','おむすび'],['progress','📋','発注進捗確認'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
+    const b=document.createElement('button');b.className='tab';b.dataset.tab=key;
+    b.onclick=()=>selectAppTab(key);
     const a=document.createElement('div');a.className='ic';a.textContent=ic;
-    const c=document.createElement('div');c.className='nm';c.textContent=n;
-    const d=document.createElement('div');d.className='ct';d.textContent=g.items.length?g.items.length+'品':'—';
-    b.append(a,c,d);el.appendChild(b)});
-  $('title').textContent=G().icon+' '+G().name+' 発注'}
+    const c=document.createElement('div');c.className='nm';c.textContent=name;
+    b.append(a,c);el.appendChild(b);
+  });
+  selectAppTab(APP_TAB);
+}
 
 function renderSetup(){
   const g=G(),i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null,s=sums('o');
@@ -1481,6 +1490,9 @@ if(!DB.g)DB=fresh();
   if(items===0&&hist===0)DB=fresh();
 })();
 ensureCategories();
+// 現在の通常画面は、いったんおむすびだけを表示する。
+// 他ジャンルのデータはDBに残し、設定・将来の再表示に備える。
+DB.active='onigiri';
 cleanMemoDisplayTest();
 applyPhotoActualFix();
 renderAll();save();

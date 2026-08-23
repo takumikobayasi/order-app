@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260822unlock1">
+<link rel="stylesheet" href="style.css?v=2026082301">
 </head><body>
 
 <header>
@@ -19,6 +19,8 @@
 </header>
 
 <div class=wrap>
+
+<div id=panelOnigiri>
 
 <div class=card id=mainMemoCard style="margin-top:12px">
 <h3 style="margin-top:0">前年メモ（同じ日の約2週間前から表示）</h3>
@@ -89,8 +91,18 @@
 </div>
 </div>
 
+ </div>
+
+<div id=panelProgress class=app-panel hidden>
 <div class=card>
-<h2><span class=n>3</span>週次データ取り込み（写真→AI→貼り付け）</h2>
+<h2>発注進捗確認</h2>
+<p class=note>この画面は準備中です。確認したい項目と入力方法を整理してから追加します。</p>
+</div>
+</div>
+
+<div id=panelCamera class=app-panel hidden>
+<div class=card>
+<h2>カメラ取り込み（写真→AI→貼り付け）</h2>
 <div id=wklist class=row-grid></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
