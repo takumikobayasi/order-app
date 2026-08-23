@@ -1438,6 +1438,8 @@ function enableDragScroll(el){
   el.addEventListener('dragstart',e=>e.preventDefault());
   el.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch')return;
+    // タブや入力欄は横ドラッグよりクリック・フォーカスを優先する。
+    if(e.target.closest('button,a,input,select,textarea'))return;
     down=true;moved=false;startX=e.clientX;startLeft=el.scrollLeft;pid=e.pointerId;
     try{el.setPointerCapture(pid)}catch(err){}
     el.classList.add('dragging');
