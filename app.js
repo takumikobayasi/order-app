@@ -7,7 +7,8 @@ const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK4
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
-let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri';
+let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri', ITEM_PAGE=0;
+const ITEMS_PER_PAGE=6;
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -600,6 +601,24 @@ function renderSetup(){
 
 function renderItems(){
   const g=G();
+  const desktop=window.matchMedia('(min-width:768px)').matches;
+  const pageCount=desktop?Math.max(1,Math.ceil(g.items.length/ITEMS_PER_PAGE)):1;
+  ITEM_PAGE=Math.min(ITEM_PAGE,pageCount-1);
+  const pageStart=desktop?ITEM_PAGE*ITEMS_PER_PAGE:0;
+  const pageItems=desktop?g.items.slice(pageStart,pageStart+ITEMS_PER_PAGE):g.items;
+  const pager=$('itemPager');
+  if(pager){
+    pager.hidden=!desktop||g.items.length<=ITEMS_PER_PAGE;
+    pager.textContent='';
+    if(!pager.hidden){
+      const prev=document.createElement('button');prev.className='gh sm';prev.textContent='◀ 前へ';
+      prev.disabled=ITEM_PAGE===0;prev.onclick=()=>gotoItemPage(ITEM_PAGE-1);
+      const label=document.createElement('span');label.textContent=`${pageStart+1}〜${Math.min(pageStart+ITEMS_PER_PAGE,g.items.length)}品 / ${g.items.length}品`;
+      const next=document.createElement('button');next.className='gh sm';next.textContent='次へ ▶';
+      next.disabled=ITEM_PAGE>=pageCount-1;next.onclick=()=>gotoItemPage(ITEM_PAGE+1);
+      pager.append(prev,label,next);
+    }
+  }
   const H=$('ith');H.textContent='';H.className=SORT?'sortmode':'';
   const hr=document.createElement('tr');
   const showOther=!SORT;
@@ -616,7 +635,8 @@ function renderItems(){
     td.colSpan=7;td.className='l';td.style.padding='18px 6px';td.style.color='var(--muted)';
     td.textContent='まだ商品がありません。「＋商品」から登録するか、バックアップを読み込んでください。';
     tr.appendChild(td);B.appendChild(tr);return}
-  g.items.forEach((r,ix)=>{
+  pageItems.forEach((r,localIx)=>{
+    const ix=pageStart+localIx;
     const tr=document.createElement('tr');
     if(SORT){
       const t0=document.createElement('td');const w=document.createElement('div');w.className='mv';
@@ -708,6 +728,11 @@ function renderItems(){
     B.appendChild(tr)});
   B.className='bins'+BINS.length+(SORT?' sortmode':'');
   addSum(BINS)}
+function gotoItemPage(page){
+  const count=Math.max(1,Math.ceil(G().items.length/ITEMS_PER_PAGE));
+  ITEM_PAGE=Math.max(0,Math.min(page,count-1));
+  renderItems();
+}
 function refreshSum(){
   const old=$('itb').querySelector('tr.sum');
   if(old)old.remove();
