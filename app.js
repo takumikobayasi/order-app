@@ -267,7 +267,7 @@ function cloudLoadSilent(){
     const localSynced=DB.syncedTs||0;
     if((data.ts||0)!==localSynced){
       const keepUrl=localStorage.getItem(GAS_KEY);
-      DB=data;DB.syncedTs=data.ts||0;ensureCategories();save();
+      DB=data;DB.syncedTs=data.ts||0;ensureCategories();DB.active='onigiri';save();
       if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();flash('☁️ 最新データを反映');
     }
@@ -517,7 +517,7 @@ function selectAppTab(tab){
   document.querySelectorAll('#tabs .tab').forEach(b=>
     b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
   $('title').textContent=tab==='onigiri'?'🍙 おむすび 発注':tab==='progress'?'発注進捗確認':'📷 カメラ取り込み';
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo(0,0);
 }
 function renderTabs(){const el=$('tabs');el.textContent='';
   [['onigiri','🍙','おむすび'],['progress','📋','発注進捗確認'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
