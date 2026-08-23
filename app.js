@@ -1437,9 +1437,9 @@ function enableDragScroll(el){
   let down=false,startX=0,startLeft=0,moved=false,pid=null;
   el.addEventListener('dragstart',e=>e.preventDefault());
   el.addEventListener('pointerdown',e=>{
-    if(e.pointerType==='touch')return;
+    if(e.pointerType==='touch'){moved=false;return;}
     // タブや入力欄は横ドラッグよりクリック・フォーカスを優先する。
-    if(e.target.closest('button,a,input,select,textarea'))return;
+    if(e.target.closest('button,a,input,select,textarea')){moved=false;return;}
     down=true;moved=false;startX=e.clientX;startLeft=el.scrollLeft;pid=e.pointerId;
     try{el.setPointerCapture(pid)}catch(err){}
     el.classList.add('dragging');
@@ -1451,7 +1451,7 @@ function enableDragScroll(el){
     if(pid!=null){try{el.releasePointerCapture(pid)}catch(err){}}};
   el.addEventListener('pointerup',end);
   el.addEventListener('pointercancel',end);
-  el.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation()}},true);
+  el.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation();moved=false}},true);
 }
 function hscrollBy(id,dir){const el=$(id);if(!el)return;
   el.scrollBy({left:dir*160,behavior:'smooth'})}
