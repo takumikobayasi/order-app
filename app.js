@@ -9,6 +9,7 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0
 
 let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri', ITEM_PAGE=0;
 const ITEMS_PER_PAGE=6;
+let DRIVE_FILES=[];
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -1276,6 +1277,69 @@ function wipe(){if(!confirm('この端末のデータを全部消します。よ
   localStorage.removeItem(KEY);location.hash='';location.reload()}
 
 /* ---------- 週次データ取り込み（写真→AI→貼り付け） ---------- */
+const DRIVE_CATEGORIES=[
+  ['mon_timeseries','月曜・時系列グラフ'],
+  ['tue_assortment','火曜・品揃え'],
+  ['waste','廃棄集計'],
+  ['order_progress','発注進捗'],
+  ['unclassified','未分類']
+];
+function driveCategoryOptions(selected){return DRIVE_CATEGORIES.map(([v,n])=>`<option value="${v}"${v===selected?' selected':''}>${n}</option>`).join('')}
+function guessDriveCategory(name){
+  const s=String(name||'');
+  if(/月曜|時系列|推移/.test(s))return'mon_timeseries';
+  if(/火曜|品揃え|修正/.test(s))return'tue_assortment';
+  if(/廃棄|原価/.test(s))return'waste';
+  if(/発注|進捗/.test(s))return'order_progress';
+  return'unclassified';
+}
+function renderDriveFiles(){
+  const el=$('driveFileList');if(!el)return;el.textContent='';
+  if(!DRIVE_FILES.length){el.textContent='まだファイルが選択されていません。';return}
+  DRIVE_FILES.forEach((entry,i)=>{
+    const row=document.createElement('div');row.className='drive-file-row';
+    const name=document.createElement('span');name.textContent=entry.file.name;name.title=entry.file.name;
+    const sel=document.createElement('select');sel.innerHTML=driveCategoryOptions(entry.category);
+    sel.onchange=()=>{entry.category=sel.value};
+    const del=document.createElement('button');del.className='gh sm';del.textContent='×';del.title='選択から外す';
+    del.onclick=()=>{DRIVE_FILES.splice(i,1);renderDriveFiles()};
+    row.append(name,sel,del);el.appendChild(row);
+  });
+}
+function addDriveFiles(files){
+  Array.from(files||[]).forEach(file=>DRIVE_FILES.push({file,category:guessDriveCategory(file.name)}));
+  renderDriveFiles();
+}
+function bytesToBase64(buf){
+  const bytes=new Uint8Array(buf),chunk=0x8000;let out='';
+  for(let i=0;i<bytes.length;i+=chunk)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+chunk,bytes.length)));
+  return btoa(out);
+}
+async function uploadDriveFiles(){
+  const url=getGasUrl(),month=$('driveMonth')?.value;
+  if(!url){alert('先に設定でGAS URLを確認してください');return}
+  if(!month){alert('対象月を選択してください');return}
+  if(!DRIVE_FILES.length){alert('画像またはPDFを選択してください');return}
+  const btn=$('driveUploadBtn'),msg=$('driveMsg');btn.disabled=true;
+  let done=0;
+  try{
+    for(const entry of DRIVE_FILES){
+      msg.textContent=`送信中 ${done+1}/${DRIVE_FILES.length}：${entry.file.name}`;
+      const data=bytesToBase64(await entry.file.arrayBuffer());
+      await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        mode:'upload',month,category:entry.category,name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data
+      })});
+      done++;
+    }
+    msg.className='note ok';msg.textContent=`✓ ${done}件を送信しました。Drive側で保存を確認してください。`;
+  }catch(e){msg.className='note crit';msg.textContent=`⚠ ${done}件送信後に停止しました。通信を確認して再実行してください。`}
+  finally{btn.disabled=false}
+}
+function initDriveImport(){
+  const month=$('driveMonth');if(month){const n=new Date();month.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`}
+  $('driveFiles')?.addEventListener('change',e=>addDriveFiles(e.target.files));
+  renderDriveFiles();
+}
 const WK_TASKS={
   mon:{label:'月曜：先週実績の写真',
     guide:'ストコン「店舗分析→日別時系列推移グラフ（中分類：おむすび）」を数量表示で撮影（1枚）'},
@@ -1525,6 +1589,7 @@ ensureCategories();
 DB.active='onigiri';
 cleanMemoDisplayTest();
 applyPhotoActualFix();
+initDriveImport();
 renderAll();save();
 cloudLoadSilent();
 
