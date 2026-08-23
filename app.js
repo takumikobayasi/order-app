@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
 const DEFAULT_LOC={lat:36.1214,lon:139.6015,name:'加須市(埼玉県)'};
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbypnSUGdcjGtZIDdnKXZ5jCkmJ-G0wjjVBb8An-Chqyp-PDXXjoDEwTLVXdY36w2m74/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwU6-Ut_7ChPXtVr5fOEq5iPd7m0G5VNkcMJ8g27XQ_aBv2t0S-WUJNtmtoUYDqyZ4V/exec';
 const LEGACY_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtaQ-NAYOwLHK418teJrMXqC9W2THI4qXTf-0iWXQ24oNZBKTglLNZvKU-HloUDGe6/exec';
 
 
