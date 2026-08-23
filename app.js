@@ -1297,6 +1297,9 @@ function guessDriveCategory(name){
   if(/発注|進捗/.test(s))return'order_progress';
   return'unclassified';
 }
+function driveFileKey(file){
+  return [file.name,file.size,file.lastModified,file.type].join('|');
+}
 function renderDriveFiles(){
   const el=$('driveFileList');if(!el)return;el.textContent='';
   if(!DRIVE_FILES.length){el.textContent='まだファイルが選択されていません。';return}
@@ -1311,7 +1314,13 @@ function renderDriveFiles(){
   });
 }
 function addDriveFiles(files){
-  Array.from(files||[]).forEach(file=>DRIVE_FILES.push({file,category:guessDriveCategory(file.name)}));
+  const existing=new Set(DRIVE_FILES.map(x=>driveFileKey(x.file)));
+  Array.from(files||[]).forEach(file=>{
+    const key=driveFileKey(file);
+    if(existing.has(key))return;
+    existing.add(key);
+    DRIVE_FILES.push({file,category:guessDriveCategory(file.name)});
+  });
   renderDriveFiles();
 }
 function bytesToBase64(buf){
