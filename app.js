@@ -553,23 +553,22 @@ function carryBinText(g){
 /* ---------- 描画 ---------- */
 function selectAppTab(tab){
   APP_TAB=tab;
-  const panels={onigiri:'panelOnigiri',progress:'panelProgress',profit:'panelProfit',camera:'panelCamera'};
+  const panels={onigiri:'panelOnigiri',profit:'panelProfit',camera:'panelCamera'};
   Object.entries(panels).forEach(([key,id])=>{
     const el=$(id);if(el)el.hidden=key!==tab;
   });
   document.querySelectorAll('#tabs .tab').forEach(b=>
     b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
   const g=G(),gn=`${g.icon||''} ${g.name||''}`.trim();
-  $('title').textContent=tab==='onigiri'?`${gn} 発注`:tab==='progress'?'発注進捗確認'
+  $('title').textContent=tab==='onigiri'?`${gn} 発注`
     :tab==='profit'?`💰 利益・廃棄（${g.name||''}）`:`📷 カメラ取り込み（${g.name||''}）`;
-  // ジャンルごとに中身が変わる画面だけ、ジャンル切替を出す
-  const row=$('genRow');if(row)row.hidden=(tab==='progress');
+  // どの画面もジャンルごとに中身が変わるため、ジャンル切替は常に出す
+  const row=$('genRow');if(row)row.hidden=false;
   if(tab==='profit')renderProfit();
   window.scrollTo(0,0);
 }
 function renderTabs(){const el=$('tabs');el.textContent='';
-  const cg=G();
-  [['onigiri',cg.icon||'🍙','発注'],['progress','📋','発注進捗確認'],['profit','💰','利益・廃棄'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
+  [['onigiri','📋','発注'],['profit','💰','利益・廃棄'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
     const b=document.createElement('button');b.className='tab';b.dataset.tab=key;
     b.onclick=()=>selectAppTab(key);
     const a=document.createElement('div');a.className='ic';a.textContent=ic;
