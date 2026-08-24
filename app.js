@@ -943,11 +943,27 @@ function pfOrderQty(r){
   const bins=itemBins(r,G());
   return{q:use.v.reduce((a,x,ix)=>a+(bins.includes(ix)?(x||0):0),0),mode:use.m};
 }
-/* 発注q個のときの粗利・廃棄ロス・差引 */
-function pfMoney(q,D,w,price,m){
+/* ストコンの値入率は税込売価ベース（例：売価298円・原価186.07円で値入率37.5%）。
+   アプリは売価を税抜で持つため、金額計算では税込に戻してから原価を出す */
+const TAX_RATE=1.08;
+/* 税込売価。写真から読んだ税込売価があり、いまの税抜売価と食い違っていなければそれを使う
+   （税抜に丸めてから戻すと数円ずれるため）。売価を手で直した場合は自動で使われなくなる */
+function pfPriceIn(r){
+  const ex=Number(r.price)||0, inc=Number(r&&r.priceIn);
+  if(inc>0&&Math.round(inc/TAX_RATE)===ex)return inc;
+  return ex*TAX_RATE;
+}
+/* 1個あたりの原価。原価が登録されていればそれを使い、無ければ税込売価×(1-値入率) */
+function pfCost(r,m){
+  const c=Number(r&&r.cost);
+  if(c>0)return{c,src:'原価'};
+  return{c:pfPriceIn(r)*(1-m/100),src:'値入率から計算'};
+}
+/* 発注q個のときの粗利・廃棄ロス・差引。粗利＝税込売価−原価、廃棄ロス＝原価 */
+function pfMoney(q,D,w,priceIn,cost){
   const waste=Math.min(q,Math.max(Math.max(0,q-D),w==null?0:q*w));
   const sold=q-waste;
-  const profit=sold*price*(m/100),loss=waste*price*(1-m/100);
+  const profit=sold*(priceIn-cost),loss=waste*cost;
   return{q,sold,waste,profit,loss,net:profit-loss};
 }
 /* 値入率。商品ごとの値入率が無ければジャンル既定を使い、どちらを使ったか返す */
@@ -969,15 +985,16 @@ function pfCalc(r){
   const sh=itemShelfDays(r,G());
   const win=Math.max(1,sh.d,F.cyc);
   const D=dem.d*F.f*F.wf*win;
-  const now=pfMoney(o.q,D,wr?wr.rate:null,price,m);
+  const priceIn=pfPriceIn(r), cs=pfCost(r,m);
+  const now=pfMoney(o.q,D,wr?wr.rate:null,priceIn,cs.c);
   const unit=Math.max(1,Number(r.unit)||1);
   const floor=Math.max(0,Number(r.my)||0);   // 本部目安より下は候補にしない
   let best=now;
   for(let x=o.q-unit;x>=floor;x-=unit){
-    const c=pfMoney(x,D,wr?wr.rate:null,price,m);
+    const c=pfMoney(x,D,wr?wr.rate:null,priceIn,cs.c);
     if(c.net>best.net+1)best=c;              // 1円未満の差では動かさない
   }
-  return{r,q:o.q,mode:o.mode,price,m,mSrc:mg.src,D,dem,wr,unit,floor,now,sh,win,
+  return{r,q:o.q,mode:o.mode,price,priceIn,cost:cs.c,costSrc:cs.src,m,mSrc:mg.src,D,dem,wr,unit,floor,now,sh,win,
     cut:best.q<o.q?{q:best.q,net:best.net,gain:best.net-now.net}:null};
 }
 
@@ -1034,7 +1051,7 @@ function renderProfit(){
     const have=stk+(pln!=null?pln:0)+T.q;
     const over=have-demandTotal;
     // 余りを金額にするための1個あたり原価（発注した商品の加重平均）
-    const costPer=T.q>0?ok.reduce((a,x)=>a+x.price*(1-x.m/100)*x.q,0)/T.q:0;
+    const costPer=T.q>0?ok.reduce((a,x)=>a+x.cost*x.q,0)/T.q:0;
     sum.push(['在庫込みの見通し',
       `現在庫${stk}個`+(pln!=null?` ＋ 納品予定${pln}個`:'')+` ＋ 発注${T.q}個 ＝ ${pfQty(have)}個`
       +`／期限内に売れる見込み ${pfQty(demandTotal)}個`+(g.cur.stockSrc?`（在庫の出典：${g.cur.stockSrc}）`:''),'']);
@@ -1109,7 +1126,8 @@ function renderProfit(){
     const n1=document.createElement('div');n1.className='nm1';
     const n1n=document.createElement('div');n1n.className='nm1-name';n1n.textContent=x.r.name;n1.appendChild(n1n);
     const n2=document.createElement('div');n2.className='nm2';
-    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}%${x.mSrc?'('+x.mSrc+')':''} / ${x.sh.src}`
+    n2.textContent=`${x.mode} / 売価${Math.round(x.priceIn)}円(税込) 原価${Math.round(x.cost)}円`
+      +`${x.costSrc==='原価'?'':'(値入'+x.m+'%'+(x.mSrc?'・'+x.mSrc:'')+'から)'} / ${x.sh.src}`
       +(x.win>1?`＝${x.win}日ぶんで計算`:'')
       +(x.wr?` / 実績廃棄率${(x.wr.rate*100).toFixed(1)}%（${x.wr.src}）`:' / 実績廃棄データなし');
     if(x.wr&&x.wr.rate*100>=x.m)n2.className='nm2 nm2-warn';
@@ -1138,12 +1156,15 @@ function renderProfit(){
     ['需要見込みの式','需要見込み ＝ 日販 × 曜日係数 × 天気係数 × 売り切るまでに使える日数（期限日数と発注サイクルの長い方）',''],
     ['期限の見方','商品の消費期限 → 廃棄区分D（D3なら3日ぶん、D0は1日） → ジャンルの消費期限 の順で見る。どれも無ければ1日',''],
     ['予想廃棄の式','予想廃棄数 ＝ 「発注数 − 需要見込み（期限内に売り切れない分）」と「発注数 × 実績廃棄率」の大きい方',''],
-    ['金額の式','粗利 ＝ 予想販売数 × 売価 × 値入率 ／ 廃棄ロス ＝ 予想廃棄数 × 売価 ×（1−値入率）',''],
+    ['金額の式','粗利 ＝ 予想販売数 ×（税込売価 − 原価） ／ 廃棄ロス ＝ 予想廃棄数 × 原価',''],
+    ['原価の出し方','商品に原価が登録されていればその値。無ければ 税込売価 ×（1 − 値入率）で計算します'
+      +'（ストコンの値入率は税込売価ベース。例：売価298円・値入率37.5%なら原価186円）',''],
     ['1個あたりの分岐点','実績廃棄率が値入率(%)を超えている商品は、1個増やすほど廃棄ロスが粗利を上回る計算になります','']
   ];
   if(sample)why.push(['計算例',
     `${sample.r.name}：発注${sample.q}個・需要見込み${pfQty(sample.D)}個`
     +`（${sample.dem.src}×${F.f.toFixed(2)}×${F.wf.toFixed(2)}${sample.win>1?'×'+sample.win+'日（'+sample.sh.src+'）':''}）`
+    +`／税込売価${Math.round(sample.priceIn)}円・原価${Math.round(sample.cost)}円`
     +` → 販売${pfQty(sample.now.sold)}個・廃棄${pfQty(sample.now.waste)}個`
     +` → 粗利${pfYen(sample.now.profit)}円 − 廃棄ロス${pfYen(sample.now.loss)}円 ＝ ${sample.now.net>=0?'+':''}${pfYen(sample.now.net)}円`,'']);
   why.push(['在庫の扱い',
@@ -1816,10 +1837,26 @@ const WK_TASKS={
     guide:'ストコン「発注→品揃え状況確認・修正（{gen}）」を全ページ撮影（6枚前後）'},
   mid:{label:'発注前：中分類総数の写真',
     guide:'ストコン「中分類総数（{gen}）」を撮影。現在庫・納品予定・便別の繰越を取り込む'},
+  newp:{label:'新商品：新商品案内明細の写真',
+    guide:'ストコン「新商品案内明細（{gen}）」を撮影。売価・原価・値入率・商品コードを取り込む'},
   rank:{label:'商品登録：売上ランキングの写真',
     guide:'ストコン「店舗分析→売上ランキング（{gen}）」を数量と金額の両方で撮影。商品名・売価・販売数・廃棄数を取り込む'}
 };
 function copyWeeklyPrompt(type){
+  if(type==='newp'){
+    const p=`あなたはコンビニ発注データの読み取りアシスタントです。添付した「新商品案内明細」画面の写真から、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
+#UPD1:{"type":"new","d":"8/24","items":[{"name":"手巻 シーチキンマヨネーズ","price":198,"cost":125.25,"margin":36.7,"code":"0410113","unit":1,"start":"08/24"}]}
+ルール:
+- d=画面上部の「日付」(月/日)
+- name=商品名 price=「売価」 cost=「原価」 margin=「値入率」 unit=「入数」
+- code=「商品コード」の左端の1つ start=「発注開始日」(月/日)
+- 1枚に2商品ずつ写っている場合は両方を、複数枚ある場合は全部の商品をitemsに入れる
+- 「売価 − 原価 ÷ 売価」が値入率とだいたい合うか確かめ、合わない行はcostとmarginをnullにする
+- 読み取れない値はnullにして、数字を推測で埋めない`;
+    navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
+      .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
+    return;
+  }
   if(type==='rank'){
     const p=`あなたはコンビニ発注データの読み取りアシスタントです。添付した「売上ランキング」画面の写真から、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
 #UPD1:{"type":"rank","gen":"手づくりデザート","from":"8/24","upd":"8/25","items":[{"name":"スフレ・プリン","code":"19401450","price":334,"s":7,"w":null}]}
@@ -1969,6 +2006,43 @@ function importWeekly(){
       +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`
         +'（追加したい場合は「未登録の商品も追加する」にチェック）':'')
       +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
+  }else if(d.type==='new'&&Array.isArray(d.items)){
+    /* 新商品案内明細：売価・原価・値入率・商品コードを取り込む。
+       この画面の売価は税込、値入率は税込売価ベース（売価−原価÷売価） */
+    const num=v=>(v==null||v==='')?null:Number(v);
+    let upd=0,added=0;const bad=[];
+    d.items.forEach(x=>{
+      if(!x.name)return;
+      const priceIn=num(x.price), cost=num(x.cost);
+      let margin=num(x.margin);
+      // 売価と原価から値入率を計算し直して、写真の値入率と食い違う行は知らせる
+      if(priceIn&&cost!=null){
+        const calc=Math.round((priceIn-cost)/priceIn*1000)/10;
+        if(margin==null)margin=calc;
+        else if(Math.abs(calc-margin)>0.5){bad.push(`${x.name}（値入率${margin}%だが売価と原価からは${calc}%）`);margin=calc}
+      }
+      const nx=normName(x.name);
+      let r=g.items.find(it=>{const ni=normName(it.name);return ni===nx||ni.includes(nx)||nx.includes(ni)});
+      const fields={};
+      if(priceIn){fields.price=Math.round(priceIn/1.08);fields.priceIn=priceIn}   // アプリは税抜で持ち、税込も控える
+      if(cost!=null)fields.cost=cost;
+      if(margin!=null)fields.margin=margin;
+      if(x.code)fields.code=String(x.code);
+      if(num(x.unit)>0)fields.unit=num(x.unit);
+      if(r){Object.assign(r,fields);upd++}
+      else{
+        g.items.push({id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),
+          name:x.name,day:0,grade:'新',my:0,tag:'新',
+          memo:'新商品案内'+(x.start?` 発注開始${x.start}`:''),price:0,unit:1,...fields});
+        added++;
+      }
+    });
+    g.wk.newp=today;
+    pushSnapshot(g,'new',{d:d.d||'',items:d.items});
+    msg.className=bad.length?'note warn':'note ok';
+    msg.textContent=(bad.length?'⚠ ':'✓ ')
+      +`${g.name}：${added}品を追加、${upd}品を更新（売価・原価・値入率）`
+      +(bad.length?`　※値入率が売価と原価から計算した値と違います：${bad.slice(0,3).join('、')}。売価と原価のほうを採用しました`:'');
   }else if(d.type==='rank'&&Array.isArray(d.items)){
     /* 売上ランキング：商品名・売価・期間の販売/廃棄を取り込む。
        この画面には値入率・納品数が無いため、それらは触らない */
@@ -1983,7 +2057,7 @@ function importWeekly(){
       const taxOut=priceIn?Math.round(priceIn/1.08):null;   // 画面は税込表示。アプリは税抜で持つ
       const rank={from:d.from||'',upd:d.upd||'',days,s:num(x.s),w:num(x.w)};
       if(r){
-        if(!r.price&&taxOut)r.price=taxOut;                 // すでに入っている売価は上書きしない
+        if(!r.price&&taxOut){r.price=taxOut;r.priceIn=priceIn}   // すでに入っている売価は上書きしない
         if(x.code)r.code=String(x.code);
         r.rank=rank;
         if(!(r.day>0)&&rank.s!=null){r.day=Math.round(rank.s/days*10)/10;dayFilled++}
@@ -1992,7 +2066,7 @@ function importWeekly(){
         const day=rank.s==null?0:Math.round(rank.s/days*10)/10;
         if(day)dayFilled++;
         g.items.push({id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),
-          name:x.name,price:taxOut||0,day,unit:1,grade:'○',my:0,tag:'',
+          name:x.name,price:taxOut||0,priceIn:priceIn||undefined,day,unit:1,grade:'○',my:0,tag:'',
           code:x.code?String(x.code):undefined,
           memo:'売上ランキング取込'+(day?`／日販は${d.from||''}からの${days}日分`:''),
           rank});
@@ -2037,7 +2111,7 @@ function importWeekly(){
       +(sub.length?`／小分類${sub.length}件を記録`:'')
       +(warn.length?`　※${warn.join('、')}。写真を確認してください`:'');
   }else{
-    msg.className='note crit';msg.textContent='typeがmon/tue/mid/rankのどれでもありません。プロンプトをコピーし直して試してください。';return;
+    msg.className='note crit';msg.textContent='typeがmon/tue/mid/rank/newのどれでもありません。プロンプトをコピーし直して試してください。';return;
   }
   $('wkbox').value='';renderAll();autosave();
 }
