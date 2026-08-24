@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082301">
+<link rel="stylesheet" href="style.css?v=2026082406">
 </head><body>
 
 <header>
@@ -13,6 +13,9 @@
 </div>
 <div class=hscrollrow>
 <div class="tabs" id=tabs></div>
+</div>
+<div class=hscrollrow id=genRow hidden>
+<div class="tabs" id=genTabs></div>
 </div>
 </header>
 
@@ -49,6 +52,11 @@
 <div><label class=stoconai>ストコンAI 3便</label><input id=ai3 type=number></div>
 <div><label class=stoconai>配信版</label><select id=aiver><option value="">未選択</option><option>7:30版</option><option>18時版</option><option>13:00版</option></select></div>
 </div>
+<div class="fg g3">
+<div><label>現在庫（ストコン 中分類総数）</label><input id=stk type=number placeholder="個"></div>
+<div><label>納品予定（発注済み・未納品）</label><input id=stkp type=number placeholder="個"></div>
+<div><label>便別繰越（取り込み時のみ）</label><input id=stkb placeholder="—" readonly></div>
+</div>
 <div class=btns style="margin-top:8px"><button class="gh sm" onclick="openHist()">＋前日の廃棄・実績を記録</button></div>
 <div id=setup class=row-grid></div>
 <p class=note id=setupmsg></p>
@@ -81,6 +89,7 @@
 <button class="gh sm stoconai" onclick="fillFrom('i')">ストコンAIをコピー</button>
 <button class="gh sm" onclick="editItem(null)">＋商品</button>
 <button class="gh sm" onclick="openCatalog()">品揃えマスター</button>
+<button class="gh sm" onclick="openBulk()">まとめて入力</button>
 </div>
 <div id=itemPager class=item-pager hidden></div>
 <div class=hscrollrow>
@@ -99,6 +108,36 @@
 </div>
 </div>
 
+<div id=panelProfit class=app-panel hidden>
+<div class=card>
+<h2>利益と廃棄のバランス</h2>
+<p class=note>いま入っている発注数に対して、粗利の予想と廃棄ロスの予想を比べます。<b>この画面は表示だけで、発注数は書き換えません。</b></p>
+<div class=btns>
+<button class="gh sm" onclick="renderProfit()">再計算</button>
+<button class="gh sm" id=pfAllBtn aria-pressed=false onclick="toggleProfitAll()">全品を表示</button>
+</div>
+<div id=pfHead class=row-grid></div>
+</div>
+
+<div class=card>
+<h2>ジャンル合計</h2>
+<div id=pfSum class=row-grid></div>
+<p class=note id=pfJudge></p>
+</div>
+
+<div class=card>
+<h2 id=pfListTitle>抑える候補</h2>
+<div class=hscroll id=pfWrap><table id=pfTbl><thead id=pfTh></thead><tbody id=pfTb></tbody></table></div>
+<p class=note id=pfMsg></p>
+</div>
+
+<div class=card>
+<h2>計算に使った数字と式</h2>
+<div id=pfWhy class=row-grid></div>
+<p class=note id=pfMiss></p>
+</div>
+</div>
+
 <div id=panelCamera class=app-panel hidden>
 <div class=card>
 <h2>今月の資料をGoogle Driveへ保存</h2>
@@ -114,13 +153,18 @@
 </div>
 <div class=card>
 <h2>カメラ取り込み（写真→AI→貼り付け）</h2>
+<p class=note id=wkGen></p>
 <div id=wklist class=row-grid></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
 <button class="gh sm" onclick="copyWeeklyPrompt('tue')">火曜用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('mid')">中分類総数用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('rank')">売上ランキング用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('newp')">新商品案内用プロンプトをコピー</button>
 </div>
 <p class=note>コピーしたプロンプトを、撮った写真と一緒にAIチャット（ChatGPT・Gemini・Claudeなど何でもOK）に貼ると、取り込み用のデータが返ってきます。返ってきた「#UPD1:」で始まる文字列を下に貼り付けて「取り込む」を押してください。</p>
 <textarea id=wkbox placeholder="#UPD1:{...} をここに貼り付け"></textarea>
+<label class=chk style="margin-top:8px"><input type=checkbox id=wkAddNew onchange="this.dataset.touched=1"> 写真にある未登録の商品もこのジャンルに追加する（新しいジャンルの初回登録用）</label>
 <div class=btns style="margin-top:8px"><button class=sm onclick="importWeekly()">取り込む</button></div>
 <p class=note id=wkmsg></p>
 </div>
@@ -153,6 +197,21 @@
 <button onclick="saveItem()">保存</button>
 <button class=gh onclick="document.getElementById('dItem').close()">閉じる</button>
 <button class=gh style="color:var(--crit)" onclick="delItem()">削除</button></div></dialog>
+
+<dialog id=dBulk>
+<h2>まとめて入力</h2>
+<p class=note>ひとつの項目だけを縦に並べて入力します。ストコンの画面を見ながら数字だけ入れていけます。</p>
+<div class=modes id=bulkModes></div>
+<div class=bulk-fill>
+<input id=bulkAll placeholder="例 32">
+<button class="gh sm" onclick="bulkFillEmpty()">空欄にまとめて入れる</button>
+<button class="gh sm" onclick="bulkFillAll()">全部に入れる</button>
+</div>
+<div id=bulkList class=bulk-list></div>
+<p class=note id=bulkMsg></p>
+<div class=btns style="margin-top:10px">
+<button onclick="saveBulk()">保存</button>
+<button class=gh onclick="document.getElementById('dBulk').close()">閉じる</button></div></dialog>
 
 <dialog id=dCatalog class=wide>
 <h2>品揃えマスター：<span id=catTitle></span></h2>
@@ -223,8 +282,10 @@
 <div class="fg g3">
 <div><label>消費期限（日）</label><input id=s_shelf type=number step=0.5 placeholder="例 2"></div>
 <div><label>発注サイクル（日おき）</label><input id=s_cycle type=number placeholder="例 2"></div>
-<div><label>便構成メモ</label><input id=s_binnote placeholder="例 1便・3便発注"></div>
+<div><label>ジャンル既定の値入率(%)</label><input id=s_margin type=number step=0.1 placeholder="例 32"></div>
 </div>
+<div class="fg"><div><label>便構成メモ</label><input id=s_binnote placeholder="例 1便・3便発注"></div></div>
+<p class=note>ジャンル既定の値入率は、商品ごとの値入率が未登録のときだけ利益・廃棄の計算に使います（出典を画面に出します）。</p>
 <p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 </div>
@@ -302,6 +363,6 @@
 <div class=btns style="margin-top:10px"><button onclick="doImport()">読み込む</button>
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
-<script src="data.js?v=20260822unlock1"></script>
-<script src="app.js?v=2026082410"></script>
+<script src="data.js?v=2026082501"></script>
+<script src="app.js?v=2026082501"></script>
 </body></html>

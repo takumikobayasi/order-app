@@ -171,3 +171,31 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #bmtbl td:nth-child(2){width:70px}
 #bmtbl select{width:100%;padding:4px 2px;font-size:12px;text-align:center}
 #bmtbl input[type=checkbox]{margin:0}
+
+/* 利益・廃棄タブ：列が潰れないよう最小幅を持たせ、横スクロールで見せる */
+#pfWrap{overflow-x:auto}
+#pfTbl{min-width:700px}
+#pfTbl .nmcell{max-width:200px}
+#pfWhy .row{grid-column:1/-1}
+#pfWhy .k{flex:0 0 108px}
+
+/* ジャンル切替の行（発注・利益廃棄・カメラ取り込みで表示） */
+#genRow{border-top:1px solid var(--grid)}
+#genRow .tabs{padding-top:6px}
+#genRow .tab{min-width:58px;padding:5px 10px}
+#genRow .tab .ic{font-size:17px}
+.chk{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--ink2);line-height:1.4}
+.chk input{width:auto;flex:0 0 auto;margin-top:2px}
+
+/* まとめて入力：1項目だけを縦に並べる（横スクロールなしで入力できる） */
+#bulkModes{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%}
+#bulkModes button{white-space:nowrap;flex:0 0 auto}
+.bulk-fill{display:flex;gap:6px;align-items:center;margin:8px 0 10px;flex-wrap:wrap}
+.bulk-fill input{flex:0 0 96px;width:96px}
+.bulk-list{display:grid;gap:2px;max-height:56vh;overflow-y:auto}
+.bulk-row{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:8px;align-items:center;
+padding:6px 2px;border-bottom:1px solid var(--grid)}
+.bulk-row .bn{min-width:0;font-size:13px;line-height:1.3}
+.bulk-row .bn small{display:block;color:var(--muted);font-size:11px}
+.bulk-row input,.bulk-row select{padding:7px 8px;font-size:16px;text-align:right}
+.bulk-row.done{background:rgba(27,175,122,.07)}
