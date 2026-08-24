@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082301">
+<link rel="stylesheet" href="style.css?v=2026082401">
 </head><body>
 
 <header>
@@ -96,6 +96,36 @@
 <div class=card>
 <h2>発注進捗確認</h2>
 <p class=note>この画面は準備中です。確認したい項目と入力方法を整理してから追加します。</p>
+</div>
+</div>
+
+<div id=panelProfit class=app-panel hidden>
+<div class=card>
+<h2>利益と廃棄のバランス</h2>
+<p class=note>いま入っている発注数に対して、粗利の予想と廃棄ロスの予想を比べます。<b>この画面は表示だけで、発注数は書き換えません。</b></p>
+<div class=btns>
+<button class="gh sm" onclick="renderProfit()">再計算</button>
+<button class="gh sm" id=pfAllBtn aria-pressed=false onclick="toggleProfitAll()">全品を表示</button>
+</div>
+<div id=pfHead class=row-grid></div>
+</div>
+
+<div class=card>
+<h2>ジャンル合計</h2>
+<div id=pfSum class=row-grid></div>
+<p class=note id=pfJudge></p>
+</div>
+
+<div class=card>
+<h2 id=pfListTitle>抑える候補</h2>
+<div class=hscroll id=pfWrap><table id=pfTbl><thead id=pfTh></thead><tbody id=pfTb></tbody></table></div>
+<p class=note id=pfMsg></p>
+</div>
+
+<div class=card>
+<h2>計算に使った数字と式</h2>
+<div id=pfWhy class=row-grid></div>
+<p class=note id=pfMiss></p>
 </div>
 </div>
 

@@ -171,3 +171,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #bmtbl td:nth-child(2){width:70px}
 #bmtbl select{width:100%;padding:4px 2px;font-size:12px;text-align:center}
 #bmtbl input[type=checkbox]{margin:0}
+
+/* 利益・廃棄タブ：列が潰れないよう最小幅を持たせ、横スクロールで見せる */
+#pfWrap{overflow-x:auto}
+#pfTbl{min-width:700px}
+#pfTbl .nmcell{max-width:200px}
+#pfWhy .row{grid-column:1/-1}
+#pfWhy .k{flex:0 0 108px}

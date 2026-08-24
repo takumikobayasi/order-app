@@ -517,17 +517,19 @@ function getAiAdoption(){
 /* ---------- 描画 ---------- */
 function selectAppTab(tab){
   APP_TAB=tab;
-  const panels={onigiri:'panelOnigiri',progress:'panelProgress',camera:'panelCamera'};
+  const panels={onigiri:'panelOnigiri',progress:'panelProgress',profit:'panelProfit',camera:'panelCamera'};
   Object.entries(panels).forEach(([key,id])=>{
     const el=$(id);if(el)el.hidden=key!==tab;
   });
   document.querySelectorAll('#tabs .tab').forEach(b=>
     b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
-  $('title').textContent=tab==='onigiri'?'🍙 おむすび 発注':tab==='progress'?'発注進捗確認':'📷 カメラ取り込み';
+  $('title').textContent=tab==='onigiri'?'🍙 おむすび 発注':tab==='progress'?'発注進捗確認'
+    :tab==='profit'?'💰 利益・廃棄':'📷 カメラ取り込み';
+  if(tab==='profit')renderProfit();
   window.scrollTo(0,0);
 }
 function renderTabs(){const el=$('tabs');el.textContent='';
-  [['onigiri','🍙','おむすび'],['progress','📋','発注進捗確認'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
+  [['onigiri','🍙','おむすび'],['progress','📋','発注進捗確認'],['profit','💰','利益・廃棄'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
     const b=document.createElement('button');b.className='tab';b.dataset.tab=key;
     b.onclick=()=>selectAppTab(key);
     const a=document.createElement('div');a.className='ic';a.textContent=ic;
@@ -783,7 +785,8 @@ function renderAll(){renderTabs();
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
   // 未選択なら今の時刻から最新の配信版を初期表示する（表示と選択のズレを防ぐ）
   $('aiver').value=g.cur.aiVer||aiVersionNow().cur;
-  applyDow();renderItems();renderHist();renderSetup();renderWeekly()}
+  applyDow();renderItems();renderHist();renderSetup();renderWeekly();
+  if(APP_TAB==='profit')renderProfit()}
 
 /* ---------- 廃棄実績×値入率による発注数の利益ベース補正 ---------- */
 function wasteFactor(r){
@@ -798,6 +801,213 @@ function wasteFactor(r){
   return 1-reduce;
 }
 function edayOf(r){return (r.day||0)*wasteFactor(r)}
+
+/* ---------- 利益・廃棄バランス（表示のみ。発注数は書き換えない） ----------
+   粗利予想     = 予想販売数 × 売価 × 値入率
+   廃棄ロス予想 = 予想廃棄数 × 売価 × (1-値入率)   ※廃棄は原価ロスとして数える
+   予想廃棄数   = 「需要見込みを超えた分」と「実績廃棄率×発注数」の大きい方
+   使う数字は既存データ（売価・値入率・日販・品揃え画面の週販売/週廃棄）だけから拾い、
+   足りない商品は推測せず「データ不足」として分けて表示する。 */
+let PF_ALL=false;
+const pfYen=v=>Math.round(v).toLocaleString();
+const pfQty=v=>(Math.round(v*10)/10).toString();
+
+/* 1日あたりの需要のもと。日販を優先し、無ければ品揃え画面の週販売から日割りする */
+function pfDemandBase(r){
+  if((r.day||0)>0)return{d:Number(r.day),src:'日販'+r.day+'個'};
+  const ws=(r.pos&&r.pos.sales)||[];
+  for(let i=ws.length-1;i>=0;i--){
+    if(ws[i]!=null&&ws[i]>0)return{d:ws[i]/7,src:'週販売'+ws[i]+'個÷7日'};
+  }
+  return null;
+}
+/* 発注日に効く係数。曜日・天気は既存の発注画面と同じものを使う */
+function pfFactors(){
+  const g=G(),i=dowInfo();
+  return{i,f:i?i.f:1,wf:weatherFactor($('wthr').value,i?i.r:null),
+    cyc:Math.max(1,Number(g.cycle)||1)};
+}
+/* 実績の廃棄率＝週廃棄÷(週販売+週廃棄)。品揃え画面の4週分から拾う */
+function pfWasteRate(r){
+  const s=((r.pos&&r.pos.sales)||[]).reduce((a,x)=>a+(x||0),0);
+  const w=((r.pos&&r.pos.waste)||[]).reduce((a,x)=>a+(x||0),0);
+  if(s+w<=0)return null;
+  return{rate:w/(s+w),sales:s,waste:w};
+}
+/* いま入っている発注数。「実際の発注」が入っていればそれを、無ければ「提案」を見る */
+function pfOrderQty(r){
+  const vi=vv(r.id,'i'),vo=vv(r.id,'o');
+  const use=vi.some(x=>x!=null)?{v:vi,m:'実際の発注'}:{v:vo,m:'提案'};
+  const bins=itemBins(r,G());
+  return{q:use.v.reduce((a,x,ix)=>a+(bins.includes(ix)?(x||0):0),0),mode:use.m};
+}
+/* 発注q個のときの粗利・廃棄ロス・差引 */
+function pfMoney(q,D,w,price,m){
+  const waste=Math.min(q,Math.max(Math.max(0,q-D),w==null?0:q*w));
+  const sold=q-waste;
+  const profit=sold*price*(m/100),loss=waste*price*(1-m/100);
+  return{q,sold,waste,profit,loss,net:profit-loss};
+}
+function pfCalc(r){
+  const price=Number(r.price)||0,m=(r.margin==null||r.margin==='')?null:Number(r.margin);
+  const o=pfOrderQty(r),dem=pfDemandBase(r),wr=pfWasteRate(r),F=pfFactors();
+  const miss=[];
+  if(!price)miss.push('売価');
+  if(m==null)miss.push('値入率');
+  if(!dem)miss.push('日販/週販売');
+  if(miss.length)return{r,q:o.q,mode:o.mode,miss};
+  const D=dem.d*F.f*F.wf*F.cyc;
+  const now=pfMoney(o.q,D,wr?wr.rate:null,price,m);
+  const unit=Math.max(1,Number(r.unit)||1);
+  const floor=Math.max(0,Number(r.my)||0);   // 本部目安より下は候補にしない
+  let best=now;
+  for(let x=o.q-unit;x>=floor;x-=unit){
+    const c=pfMoney(x,D,wr?wr.rate:null,price,m);
+    if(c.net>best.net+1)best=c;              // 1円未満の差では動かさない
+  }
+  return{r,q:o.q,mode:o.mode,price,m,D,dem,wr,unit,floor,now,
+    cut:best.q<o.q?{q:best.q,net:best.net,gain:best.net-now.net}:null};
+}
+
+function toggleProfitAll(){PF_ALL=!PF_ALL;renderProfit()}
+
+function renderProfit(){
+  if(!$('pfSum'))return;
+  const g=G(),F=pfFactors();
+  const all=g.items.map(pfCalc);
+  const ok=all.filter(x=>!x.miss&&x.q>0);
+  const miss=all.filter(x=>x.miss&&x.q>0);
+  const none=all.filter(x=>!x.miss&&x.q===0).length;
+
+  /* --- 使った数字の出典 --- */
+  const modeCnt=ok.reduce((a,x)=>{a[x.mode]=(a[x.mode]||0)+1;return a},{});
+  const modeTxt=Object.keys(modeCnt).length
+    ? Object.entries(modeCnt).map(([k,v])=>`${k} ${v}品`).join(' / ')
+    : '発注数が入っていません';
+  const head=[
+    ['納品日',($('dt').value||'').trim()||'未入力',($('dt').value||'').trim()?'':'warn'],
+    ['発注数の出典',modeTxt,ok.length?'':'warn'],
+    ['曜日係数',F.i?`${F.i.d}曜 ${F.f.toFixed(2)}（${F.i.src}）`:'納品日が未入力のため1.00で計算','' ],
+    ['天気係数',`${F.wf.toFixed(2)}（${($('wthr').value||'').trim()||'天気未入力'}）`,''],
+    ['発注サイクル',F.cyc>1?`${F.cyc}日分をこの発注でまかなう前提`:'1日分（毎日発注）','']
+  ];
+  const H=$('pfHead');H.textContent='';
+  head.forEach(([k,v,st])=>{
+    const w=document.createElement('div');w.className='row';
+    const a=document.createElement('div');a.className='k';a.textContent=k;
+    const b=document.createElement('div');b.className='v '+(st||'');b.textContent=v;
+    w.append(a,b);H.appendChild(w)});
+
+  /* --- ジャンル合計 --- */
+  const T=ok.reduce((a,x)=>{a.q+=x.q;a.sold+=x.now.sold;a.waste+=x.now.waste;
+    a.profit+=x.now.profit;a.loss+=x.now.loss;a.net+=x.now.net;
+    if(x.cut){a.gain+=x.cut.gain;a.cutQ+=x.q-x.cut.q;a.cutN++}
+    return a},{q:0,sold:0,waste:0,profit:0,loss:0,net:0,gain:0,cutQ:0,cutN:0});
+  const wRate=T.q>0?T.waste/T.q*100:0;
+  const sum=[
+    ['発注合計',ok.length?`${T.q}個（${ok.length}品）`:'—',ok.length?'':'warn'],
+    ['予想販売数',ok.length?`${pfQty(T.sold)}個`:'—',''],
+    ['予想廃棄数',ok.length?`${pfQty(T.waste)}個（発注の${wRate.toFixed(1)}%）`:'—',wRate>=10?'warn':''],
+    ['粗利予想',ok.length?`${pfYen(T.profit)}円`:'—',''],
+    ['廃棄ロス予想',ok.length?`${pfYen(T.loss)}円`:'—',T.loss>T.profit?'crit':''],
+    ['差引',ok.length?`${T.net>=0?'+':''}${pfYen(T.net)}円`:'—',T.net<0?'crit':'ok']
+  ];
+  if(T.cutN)sum.push(['抑えた場合',
+    `${T.cutN}品で計${T.cutQ}個減らすと 差引 ${T.net+T.gain>=0?'+':''}${pfYen(T.net+T.gain)}円（${pfYen(T.gain)}円 改善）`,'warn']);
+  // ストコンの実績金額があれば比較材料として並べる（出典を明示、計算には使わない）
+  const wa=g.weekHist&&g.weekHist.amount&&g.weekHist.amount.cur&&g.weekHist.amount.cur.weekAvg;
+  if(wa&&(wa.profit!=null||wa.wasteCost!=null))sum.push(['実績の週平均（参考）',
+    `粗利${wa.profit!=null?pfYen(wa.profit):'—'}円 / 廃棄原価${wa.wasteCost!=null?pfYen(wa.wasteCost):'—'}円`
+    +(g.weekHist.range?`（${g.weekHist.range} ストコン日別推移）`:''),'']);
+  const S=$('pfSum');S.textContent='';
+  sum.forEach(([k,v,st])=>{
+    const w=document.createElement('div');w.className='row';
+    const a=document.createElement('div');a.className='k';a.textContent=k;
+    const b=document.createElement('div');b.className='v '+(st||'');b.textContent=v;
+    w.append(a,b);S.appendChild(w)});
+
+  const J=$('pfJudge');
+  if(!ok.length){J.className='note warn';J.textContent='計算できる商品がありません。発注数を入れるか、売価・値入率・日販を登録してください。'}
+  else if(T.net<0){J.className='note crit';
+    J.textContent=`廃棄ロス予想（${pfYen(T.loss)}円）が粗利予想（${pfYen(T.profit)}円）を上回っています。下の候補で発注を抑えることを検討してください。`}
+  else if(T.gain>0){J.className='note warn';
+    J.textContent=`全体では差引プラスですが、${T.cutN}品を抑えると差引が${pfYen(T.gain)}円改善する計算です。`}
+  else{J.className='note ok';J.textContent='いまの発注数では、粗利予想が廃棄ロス予想を上回っています。抑える候補はありません。'}
+
+  /* --- 商品ごとの一覧 --- */
+  const cand=ok.filter(x=>x.cut||x.now.net<0);
+  const list=(PF_ALL?ok:cand).slice().sort((a,b)=>
+    (b.cut?b.cut.gain:0)-(a.cut?a.cut.gain:0)||a.now.net-b.now.net);
+  $('pfListTitle').textContent=PF_ALL?`全品（${ok.length}品）`:`抑える候補（${cand.length}品）`;
+  const btn=$('pfAllBtn');
+  if(btn){btn.setAttribute('aria-pressed',String(PF_ALL));btn.textContent=PF_ALL?'候補だけ表示':'全品を表示'}
+  const TH=$('pfTh');TH.textContent='';
+  const hr=document.createElement('tr');
+  ['商品','発注','抑え目安','改善','差引','予想販売','予想廃棄','粗利予想','廃棄ロス'].forEach((c,ix)=>{
+    const th=document.createElement('th');th.textContent=c;if(ix===0)th.className='l';hr.appendChild(th)});
+  TH.appendChild(hr);
+  const B=$('pfTb');B.textContent='';
+  if(!list.length){
+    const tr=document.createElement('tr'),td=document.createElement('td');
+    td.colSpan=9;td.className='l';td.style.padding='16px 6px';td.style.color='var(--muted)';
+    td.textContent=ok.length?'抑える候補はありません。':'表示できる商品がありません。';
+    tr.appendChild(td);B.appendChild(tr);
+  }
+  list.forEach(x=>{
+    const tr=document.createElement('tr');
+    const c=(t,cl)=>{const td=document.createElement('td');td.textContent=t;if(cl)td.className=cl;tr.appendChild(td);return td};
+    const nm=c('','l nmcell');
+    const n1=document.createElement('div');n1.className='nm1';
+    const n1n=document.createElement('div');n1n.className='nm1-name';n1n.textContent=x.r.name;n1.appendChild(n1n);
+    const n2=document.createElement('div');n2.className='nm2';
+    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}%`
+      +(x.wr?` / 実績廃棄率${(x.wr.rate*100).toFixed(1)}%`:' / 実績廃棄データなし');
+    if(x.wr&&x.wr.rate*100>=x.m)n2.className='nm2 nm2-warn';
+    nm.append(n1,n2);
+    // 見たい順：いまの発注 → 抑え目安 → 改善額 → 差引 → 内訳
+    c(x.q);
+    c(x.cut?`${x.cut.q}個`:'—',x.cut?'warn':'');
+    c(x.cut?`+${pfYen(x.cut.gain)}円`:'—',x.cut?'warn':'');
+    c((x.now.net>=0?'+':'')+pfYen(x.now.net),x.now.net<0?'crit':'');
+    c(pfQty(x.now.sold));c(pfQty(x.now.waste));
+    c(pfYen(x.now.profit));c(pfYen(x.now.loss));
+    B.appendChild(tr);
+  });
+  const msg=$('pfMsg');
+  const notes=[];
+  if(none)notes.push(`発注数が0の商品${none}品は計算対象外です。`);
+  notes.push('「抑え目安」は本部目安と発注単位を下回らない範囲で、差引がいちばん大きくなる数です。この画面では発注数を書き換えません。');
+  msg.textContent=notes.join(' ');
+
+  /* --- 根拠（入力→出典→式→結果→未確認） --- */
+  const sample=list[0]||ok[0];
+  const why=[
+    ['使った入力値','売価・値入率・日販（商品設定）／週販売・週廃棄（品揃えマスター取込）／発注数（この画面の発注入力）',''],
+    ['需要見込みの式','需要見込み ＝ 日販 × 曜日係数 × 天気係数'+(F.cyc>1?' × 発注サイクル日数':''),''],
+    ['予想廃棄の式','予想廃棄数 ＝ 「発注数 − 需要見込み」と「発注数 × 実績廃棄率」の大きい方',''],
+    ['金額の式','粗利 ＝ 予想販売数 × 売価 × 値入率 ／ 廃棄ロス ＝ 予想廃棄数 × 売価 ×（1−値入率）',''],
+    ['1個あたりの分岐点','実績廃棄率が値入率(%)を超えている商品は、1個増やすほど廃棄ロスが粗利を上回る計算になります','']
+  ];
+  if(sample)why.push(['計算例',
+    `${sample.r.name}：発注${sample.q}個・需要見込み${pfQty(sample.D)}個`
+    +`（${sample.dem.src}×${F.f.toFixed(2)}×${F.wf.toFixed(2)}${F.cyc>1?'×'+F.cyc+'日':''}）`
+    +` → 販売${pfQty(sample.now.sold)}個・廃棄${pfQty(sample.now.waste)}個`
+    +` → 粗利${pfYen(sample.now.profit)}円 − 廃棄ロス${pfYen(sample.now.loss)}円 ＝ ${sample.now.net>=0?'+':''}${pfYen(sample.now.net)}円`,'']);
+  why.push(['未確認・注意',
+    '需要見込みは日販と係数からの推測です。実際の売れ方（時間帯・便別の在庫切れ・機会ロス）は含みません。'
+    +'廃棄ロスは原価ロスとして数えています。欠品による売り逃しは金額に入っていないため、抑え目安どおりに減らすと欠品する場合があります。','warn']);
+  const W=$('pfWhy');W.textContent='';
+  why.forEach(([k,v,st])=>{
+    const w=document.createElement('div');w.className='row';w.style.gridColumn='1/-1';
+    const a=document.createElement('div');a.className='k';a.style.flex='0 0 120px';a.textContent=k;
+    const b=document.createElement('div');b.className='v '+(st||'');b.textContent=v;
+    w.append(a,b);W.appendChild(w)});
+  const M=$('pfMiss');
+  M.textContent=miss.length
+    ? 'データ不足で計算できない商品：'+miss.map(x=>`${x.r.name}（${x.miss.join('・')}が未登録）`).join(' / ')
+    : '';
+  M.className=miss.length?'note warn':'note';
+}
 
 /* ---------- 公式マニュアル準拠：売筋上位50%傾斜配分 ---------- */
 function fix2(v,unit){if((unit||1)<2)return v.slice();v=v.slice();const T=v.reduce((a,b)=>a+b,0);
