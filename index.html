@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082402">
+<link rel="stylesheet" href="style.css?v=2026082404">
 </head><body>
 
 <header>
@@ -51,6 +51,11 @@
 <div><label class=stoconai>ストコンAI 2便</label><input id=ai2 type=number></div>
 <div><label class=stoconai>ストコンAI 3便</label><input id=ai3 type=number></div>
 <div><label class=stoconai>配信版</label><select id=aiver><option value="">未選択</option><option>7:30版</option><option>18時版</option><option>13:00版</option></select></div>
+</div>
+<div class="fg g3">
+<div><label>現在庫（ストコン 中分類総数）</label><input id=stk type=number placeholder="個"></div>
+<div><label>納品予定（発注済み・未納品）</label><input id=stkp type=number placeholder="個"></div>
+<div><label>便別繰越（取り込み時のみ）</label><input id=stkb placeholder="—" readonly></div>
 </div>
 <div class=btns style="margin-top:8px"><button class="gh sm" onclick="openHist()">＋前日の廃棄・実績を記録</button></div>
 <div id=setup class=row-grid></div>
@@ -152,6 +157,8 @@
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
 <button class="gh sm" onclick="copyWeeklyPrompt('tue')">火曜用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('mid')">中分類総数用プロンプトをコピー</button>
+<button class="gh sm" onclick="copyWeeklyPrompt('rank')">売上ランキング用プロンプトをコピー</button>
 </div>
 <p class=note>コピーしたプロンプトを、撮った写真と一緒にAIチャット（ChatGPT・Gemini・Claudeなど何でもOK）に貼ると、取り込み用のデータが返ってきます。返ってきた「#UPD1:」で始まる文字列を下に貼り付けて「取り込む」を押してください。</p>
 <textarea id=wkbox placeholder="#UPD1:{...} をここに貼り付け"></textarea>
@@ -258,8 +265,10 @@
 <div class="fg g3">
 <div><label>消費期限（日）</label><input id=s_shelf type=number step=0.5 placeholder="例 2"></div>
 <div><label>発注サイクル（日おき）</label><input id=s_cycle type=number placeholder="例 2"></div>
-<div><label>便構成メモ</label><input id=s_binnote placeholder="例 1便・3便発注"></div>
+<div><label>ジャンル既定の値入率(%)</label><input id=s_margin type=number step=0.1 placeholder="例 32"></div>
 </div>
+<div class="fg"><div><label>便構成メモ</label><input id=s_binnote placeholder="例 1便・3便発注"></div></div>
+<p class=note>ジャンル既定の値入率は、商品ごとの値入率が未登録のときだけ利益・廃棄の計算に使います（出典を画面に出します）。</p>
 <p class=note>数日おきにまとめて発注するカテゴリ（パスタ・麺類など）で、期限内に売り切れる上限を計算します。</p>
 <div class=btns><button class="gh sm" onclick="applySuggestBase()">実績平均を反映</button><button class=sm onclick="saveBase()">保存</button></div>
 </div>

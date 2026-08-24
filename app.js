@@ -473,7 +473,10 @@ function saveOrderDateDraft(){
   if(!orderDateParts(d))return;
   g.dateDrafts=g.dateDrafts||{};
   g.dateDrafts[d]={v:cloneOrderState(g.cur.v),wthr:g.cur.wthr||'',
-    ai:Array.isArray(g.cur.ai)?g.cur.ai.slice():[null,null,null],aiVer:g.cur.aiVer||''};
+    ai:Array.isArray(g.cur.ai)?g.cur.ai.slice():[null,null,null],aiVer:g.cur.aiVer||'',
+    carry:g.cur.carry??null,plan:g.cur.plan??null,stockItems:g.cur.stockItems??null,
+    carryBin:Array.isArray(g.cur.carryBin)?g.cur.carryBin.slice():null,
+    stockSrc:g.cur.stockSrc||''};
 }
 function loadOrderDate(d){
   const g=G();if(!orderDateParts(d))return;
@@ -484,6 +487,11 @@ function loadOrderDate(d){
   g.cur.wthr=old?old.wthr:'';
   g.cur.ai=old&&Array.isArray(old.ai)?old.ai.slice():[null,null,null];
   g.cur.aiVer=old?old.aiVer:'';
+  g.cur.carry=old?(old.carry??null):null;
+  g.cur.plan=old?(old.plan??null):null;
+  g.cur.stockItems=old?(old.stockItems??null):null;
+  g.cur.carryBin=old&&Array.isArray(old.carryBin)?old.carryBin.slice():null;
+  g.cur.stockSrc=old?(old.stockSrc||''):'';
   $('tq').value='';$('ta').value='';
   renderAll();
   autosave();
@@ -535,6 +543,13 @@ function getAiAdoption(){
   return {rate,label,cls,match,total};
 }
 
+/* 便別繰越の表示。ジャンルで使う便だけを出す */
+function carryBinText(g){
+  g=g||G();
+  const b=g.cur.carryBin;
+  if(!Array.isArray(b)||!b.some(x=>x!=null))return '';
+  return binsUsed(g).map(i=>`${i+1}便 ${b[i]==null?'—':b[i]}`).join(' / ');
+}
 /* ---------- 描画 ---------- */
 function selectAppTab(tab){
   APP_TAB=tab;
@@ -638,6 +653,15 @@ function renderSetup(){
             : `発注${s.T}個は約${daysLeft.toFixed(1)}日分。次回発注(${cyc}日後)まで在庫はもつ見込み`,
         (left<=0||daysLeft<cyc)?'crit':'ok']);
     }
+  }
+  // 現在庫（ストコン中分類総数の繰越）。入っていれば発注判断の材料として出す
+  const stk=(g.cur.carry==null||g.cur.carry==='')?null:Number(g.cur.carry);
+  const pln=(g.cur.plan==null||g.cur.plan==='')?null:Number(g.cur.plan);
+  if(stk!=null){
+    const cb=carryBinText(g);
+    rows.splice(rows.length-1,0,['現在庫',
+      `${stk}個`+(pln!=null?` ＋ 納品予定${pln}個 ＝ ${stk+pln}個`:'')
+      +(cb?`（${cb}）`:'')+(g.cur.stockSrc?`　出典：${g.cur.stockSrc}`:''),'']);
   }
   if(g.binNote)rows.splice(rows.length-1,0,['便構成',g.binNote,'']);
   // ストコンAIの配信版と、次の更新までの時間を表示
@@ -841,6 +865,8 @@ function renderAll(){renderTabs();
   $('wthr').value=g.cur.wthr||'';
   const ai=g.cur.ai||[null,null,null];
   $('ai1').value=ai[0]??'';$('ai2').value=ai[1]??'';$('ai3').value=ai[2]??'';
+  $('stk').value=g.cur.carry??'';$('stkp').value=g.cur.plan??'';
+  $('stkb').value=carryBinText(g);
   // 未選択なら今の時刻から最新の配信版を初期表示する（表示と選択のズレを防ぐ）
   $('aiver').value=g.cur.aiVer||aiVersionNow().cur;
   applyDow();renderItems();renderHist();renderSetup();renderWeekly();
@@ -885,6 +911,8 @@ function itemShelfDays(r,g){
 /* 1日あたりの需要のもと。日販を優先し、無ければ品揃え画面の週販売から日割りする */
 function pfDemandBase(r){
   if((r.day||0)>0)return{d:Number(r.day),src:'日販'+r.day+'個'};
+  if(r.rank&&r.rank.s!=null&&r.rank.days>0)
+    return{d:r.rank.s/r.rank.days,src:`売上ランキング${r.rank.s}個÷${r.rank.days}日`};
   const ws=(r.pos&&r.pos.sales)||[];
   for(let i=ws.length-1;i>=0;i--){
     if(ws[i]!=null&&ws[i]>0)return{d:ws[i]/7,src:'週販売'+ws[i]+'個÷7日'};
@@ -901,8 +929,12 @@ function pfFactors(){
 function pfWasteRate(r){
   const s=((r.pos&&r.pos.sales)||[]).reduce((a,x)=>a+(x||0),0);
   const w=((r.pos&&r.pos.waste)||[]).reduce((a,x)=>a+(x||0),0);
-  if(s+w<=0)return null;
-  return{rate:w/(s+w),sales:s,waste:w};
+  if(s+w>0)return{rate:w/(s+w),sales:s,waste:w,src:'品揃え4週'};
+  if(r.rank&&(r.rank.s!=null||r.rank.w!=null)){
+    const rs=r.rank.s||0, rw=r.rank.w||0;
+    if(rs+rw>0)return{rate:rw/(rs+rw),sales:rs,waste:rw,src:`売上ランキング${r.rank.days}日分`};
+  }
+  return null;
 }
 /* いま入っている発注数。「実際の発注」が入っていればそれを、無ければ「提案」を見る */
 function pfOrderQty(r){
@@ -918,8 +950,15 @@ function pfMoney(q,D,w,price,m){
   const profit=sold*price*(m/100),loss=waste*price*(1-m/100);
   return{q,sold,waste,profit,loss,net:profit-loss};
 }
+/* 値入率。商品ごとの値入率が無ければジャンル既定を使い、どちらを使ったか返す */
+function pfMargin(r,g){
+  if(r.margin!=null&&r.margin!=='')return{m:Number(r.margin),src:''};
+  const gm=(g||G()).margin;
+  if(gm!=null&&gm!=='')return{m:Number(gm),src:'ジャンル既定'};
+  return{m:null,src:''};
+}
 function pfCalc(r){
-  const price=Number(r.price)||0,m=(r.margin==null||r.margin==='')?null:Number(r.margin);
+  const price=Number(r.price)||0,mg=pfMargin(r,G()),m=mg.m;
   const o=pfOrderQty(r),dem=pfDemandBase(r),wr=pfWasteRate(r),F=pfFactors();
   const miss=[];
   if(!price)miss.push('売価');
@@ -938,7 +977,7 @@ function pfCalc(r){
     const c=pfMoney(x,D,wr?wr.rate:null,price,m);
     if(c.net>best.net+1)best=c;              // 1円未満の差では動かさない
   }
-  return{r,q:o.q,mode:o.mode,price,m,D,dem,wr,unit,floor,now,sh,win,
+  return{r,q:o.q,mode:o.mode,price,m,mSrc:mg.src,D,dem,wr,unit,floor,now,sh,win,
     cut:best.q<o.q?{q:best.q,net:best.net,gain:best.net-now.net}:null};
 }
 
@@ -986,6 +1025,34 @@ function renderProfit(){
     ['廃棄ロス予想',ok.length?`${pfYen(T.loss)}円`:'—',T.loss>T.profit?'crit':''],
     ['差引',ok.length?`${T.net>=0?'+':''}${pfYen(T.net)}円`:'—',T.net<0?'crit':'ok']
   ];
+  // 現在庫を入れた見通し。在庫が積み上がっていると、発注を抑えても余る場合がある
+  const stk=(g.cur.carry==null||g.cur.carry==='')?null:Number(g.cur.carry);
+  const pln=(g.cur.plan==null||g.cur.plan==='')?null:Number(g.cur.plan);
+  let overStock=null;
+  if(stk!=null){
+    const demandTotal=ok.reduce((a,x)=>a+x.D,0);          // 各商品の期限日数ぶんの需要見込み合計
+    const have=stk+(pln!=null?pln:0)+T.q;
+    const over=have-demandTotal;
+    // 余りを金額にするための1個あたり原価（発注した商品の加重平均）
+    const costPer=T.q>0?ok.reduce((a,x)=>a+x.price*(1-x.m/100)*x.q,0)/T.q:0;
+    sum.push(['在庫込みの見通し',
+      `現在庫${stk}個`+(pln!=null?` ＋ 納品予定${pln}個`:'')+` ＋ 発注${T.q}個 ＝ ${pfQty(have)}個`
+      +`／期限内に売れる見込み ${pfQty(demandTotal)}個`+(g.cur.stockSrc?`（在庫の出典：${g.cur.stockSrc}）`:''),'']);
+    const si=Number(g.cur.stockItems)||0;
+    if(si&&si>g.items.length){
+      sum.push(['在庫の対象範囲',
+        `ストコンでは${si}品ありますが、アプリに登録されているのは${g.items.length}品です。`
+        +'在庫込みの見通しは、登録した商品ぶんの需要としか比べていないため参考値です','warn']);
+    }
+    if(ok.length){
+      overStock={over,costPer,partial:si&&si>g.items.length};
+      sum.push(['余る見込み',
+        over>0
+          ? `${pfQty(over)}個（原価換算 約${pfYen(over*costPer)}円）。発注を${Math.min(T.q,Math.ceil(over))}個抑えると余りが解消する計算`
+          : `余りは出ない見込み（${pfQty(-over)}個ぶん余裕）`,
+        over>0?'crit':'ok']);
+    }
+  }
   if(T.cutN)sum.push(['抑えた場合',
     `${T.cutN}品で計${T.cutQ}個減らすと 差引 ${T.net+T.gain>=0?'+':''}${pfYen(T.net+T.gain)}円（${pfYen(T.gain)}円 改善）`,'warn']);
   // ストコンの実績金額があれば比較材料として並べる（出典を明示、計算には使わない）
@@ -1006,9 +1073,15 @@ function renderProfit(){
   else if(!ok.length){J.className='note warn';J.textContent='計算できる商品がありません。発注数を入れるか、売価・値入率・日販を登録してください。'}
   else if(T.net<0){J.className='note crit';
     J.textContent=`廃棄ロス予想（${pfYen(T.loss)}円）が粗利予想（${pfYen(T.profit)}円）を上回っています。下の候補で発注を抑えることを検討してください。`}
+  else if(overStock&&overStock.over>0){J.className=overStock.partial?'note warn':'note crit';
+    J.textContent=overStock.partial
+      ? `登録済みの商品だけで見ると${pfQty(overStock.over)}個余る計算ですが、ストコンの品数より登録が少ないため参考値です。まず商品を登録してください。`
+      : `現在庫を入れると${pfQty(overStock.over)}個（原価 約${pfYen(overStock.over*overStock.costPer)}円）余る見込みです。`
+        +`在庫が残っているので、発注を${Math.min(T.q,Math.ceil(overStock.over))}個ぶん抑えることを検討してください。`}
   else if(T.gain>0){J.className='note warn';
     J.textContent=`全体では差引プラスですが、${T.cutN}品を抑えると差引が${pfYen(T.gain)}円改善する計算です。`}
-  else{J.className='note ok';J.textContent='いまの発注数では、粗利予想が廃棄ロス予想を上回っています。抑える候補はありません。'}
+  else{J.className='note ok';J.textContent='いまの発注数では、粗利予想が廃棄ロス予想を上回っています。'
+      +(stk!=null?'現在庫を入れても余りは出ない見込みです。':'')+'抑える候補はありません。'}
 
   /* --- 商品ごとの一覧 --- */
   const cand=ok.filter(x=>x.cut||x.now.net<0);
@@ -1036,9 +1109,9 @@ function renderProfit(){
     const n1=document.createElement('div');n1.className='nm1';
     const n1n=document.createElement('div');n1n.className='nm1-name';n1n.textContent=x.r.name;n1.appendChild(n1n);
     const n2=document.createElement('div');n2.className='nm2';
-    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}% / ${x.sh.src}`
+    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}%${x.mSrc?'('+x.mSrc+')':''} / ${x.sh.src}`
       +(x.win>1?`＝${x.win}日ぶんで計算`:'')
-      +(x.wr?` / 実績廃棄率${(x.wr.rate*100).toFixed(1)}%`:' / 実績廃棄データなし');
+      +(x.wr?` / 実績廃棄率${(x.wr.rate*100).toFixed(1)}%（${x.wr.src}）`:' / 実績廃棄データなし');
     if(x.wr&&x.wr.rate*100>=x.m)n2.className='nm2 nm2-warn';
     nm.append(n1,n2);
     // 見たい順：いまの発注 → 抑え目安 → 改善額 → 差引 → 内訳
@@ -1073,9 +1146,14 @@ function renderProfit(){
     +`（${sample.dem.src}×${F.f.toFixed(2)}×${F.wf.toFixed(2)}${sample.win>1?'×'+sample.win+'日（'+sample.sh.src+'）':''}）`
     +` → 販売${pfQty(sample.now.sold)}個・廃棄${pfQty(sample.now.waste)}個`
     +` → 粗利${pfYen(sample.now.profit)}円 − 廃棄ロス${pfYen(sample.now.loss)}円 ＝ ${sample.now.net>=0?'+':''}${pfYen(sample.now.net)}円`,'']);
+  why.push(['在庫の扱い',
+    stk!=null
+      ? '現在庫と納品予定は「在庫込みの見通し」だけで使っています。商品ごとの粗利・廃棄ロスは発注数だけで計算しているため、在庫のぶんは商品ごとの数字には入っていません。'
+      : '現在庫が未入力です。「中分類総数」の写真を取り込むか、発注画面の現在庫欄に入れると、在庫を含めた余り見込みが出せます。',
+    stk!=null?'':'warn']);
   why.push(['未確認・注意',
     '需要見込みは日販と係数からの推測です。実際の売れ方（時間帯・便別の在庫切れ・機会ロス）は含みません。'
-    +'現在庫は見ていないため、すでに在庫が積み上がっている商品は廃棄がこの計算より増えます。'
+    +'在庫がどの商品に何個あるかは分からないため、余りはジャンル合計でしか出せません。'
     +'廃棄ロスは原価ロスとして数えています。欠品による売り逃しは金額に入っていないため、抑え目安どおりに減らすと欠品する場合があります。','warn']);
   const W=$('pfWhy');W.textContent='';
   why.forEach(([k,v,st])=>{
@@ -1084,8 +1162,10 @@ function renderProfit(){
     const b=document.createElement('div');b.className='v '+(st||'');b.textContent=v;
     w.append(a,b);W.appendChild(w)});
   const M=$('pfMiss');
+  const needMargin=miss.some(x=>x.miss.includes('値入率'));
   M.textContent=miss.length
     ? 'データ不足で計算できない商品：'+miss.map(x=>`${x.r.name}（${x.miss.join('・')}が未登録）`).join(' / ')
+      +(needMargin?'　※値入率は設定の「ジャンル既定の値入率」でまとめて補えます':'')
     : '';
   M.className=miss.length?'note warn':'note';
 }
@@ -1406,7 +1486,8 @@ function saveBase(){const g=G();
   g.base=Number($('s_base').value)||0;g.up=Number($('s_up').value)||1;
   g.shelf=Number($('s_shelf').value)||0;g.cycle=Number($('s_cycle').value)||0;
   g.binNote=$('s_binnote').value.trim();
-  renderSetup();autosave();flash('保存しました')}
+  g.margin=$('s_margin').value===''?undefined:Number($('s_margin').value);
+  renderSetup();if(APP_TAB==='profit')renderProfit();autosave();flash('保存しました')}
 /* 特殊カレンダー(GW/お盆/年末年始)と当日(集計未確定)を除いた実績平均を提案する */
 function suggestBase(){
   const g=G();
@@ -1424,6 +1505,7 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('wipeToggle').style.display='';$('wipeBtn').style.display='none';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('s_shelf').value=g.shelf||'';$('s_cycle').value=g.cycle||'';$('s_binnote').value=g.binNote||'';
+  $('s_margin').value=g.margin??'';
   $('loc_status').textContent='現在の地域: '+getLoc().name;
   renderMemoDisplaySetting();renderMemos();renderBinMx();
   const sug=suggestBase();
@@ -1651,11 +1733,43 @@ function initDriveImport(){
 }
 const WK_TASKS={
   mon:{label:'月曜：先週実績の写真',
-    guide:'ストコン「店舗分析→日別時系列推移グラフ（中分類：おむすび）」を数量表示で撮影（1枚）'},
+    guide:'ストコン「店舗分析→日別時系列推移グラフ（中分類：{gen}）」を数量表示で撮影（1枚）'},
   tue:{label:'火曜：品揃え・新商品の写真',
-    guide:'ストコン「発注→品揃え状況確認・修正（おむすび）」を全ページ撮影（6枚前後）'}
+    guide:'ストコン「発注→品揃え状況確認・修正（{gen}）」を全ページ撮影（6枚前後）'},
+  mid:{label:'発注前：中分類総数の写真',
+    guide:'ストコン「中分類総数（{gen}）」を撮影。現在庫・納品予定・便別の繰越を取り込む'},
+  rank:{label:'商品登録：売上ランキングの写真',
+    guide:'ストコン「店舗分析→売上ランキング（{gen}）」を数量と金額の両方で撮影。商品名・売価・販売数・廃棄数を取り込む'}
 };
 function copyWeeklyPrompt(type){
+  if(type==='rank'){
+    const p=`あなたはコンビニ発注データの読み取りアシスタントです。添付した「売上ランキング」画面の写真から、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
+#UPD1:{"type":"rank","gen":"手づくりデザート","from":"8/24","upd":"8/25","items":[{"name":"スフレ・プリン","code":"19401450","price":334,"s":7,"w":null}]}
+ルール:
+- gen=画面上部の「中分類」（無ければ「大分類」）の名前
+- from=「対象期間」の開始日(月/日) upd=右上の「更新日時」の日付(月/日)
+- name=商品名（写真の表記のまま） code=商品コード price=売価（¥の数字をそのまま）
+- s=自店の「販売」の数量 w=自店の「廃棄」の数量。空欄はnull
+- 数量表示と金額表示の写真が両方ある場合は、数量表示のほうの数字を使う
+- 金額表示の写真があるときは「売価×数量＝金額」が合うか確かめ、合わない行はnullにする
+- 画面に写っている全商品を含め、読み取れない値はnullにして推測で埋めない`;
+    navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
+      .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
+    return;
+  }
+  if(type==='mid'){
+    const p=`あなたはコンビニ発注データの読み取りアシスタントです。添付した「中分類総数」画面の写真から、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
+#UPD1:{"type":"mid","gen":"手づくりデザート","d":"8/25","stock":71,"plan":38,"carry":[14,null,null],"sub":[{"name":"ケーキ","stock":34,"plan":7,"items":[7,12,0]}]}
+ルール:
+- gen=画面上部の「中分類」の名前 d=画面上部の「発注日」(月/日)
+- stock=中分類の「現在庫」 plan=中分類の「納品予定」
+- carry=「繰越」の行のうち、発注日の列にある1便/2便/3便の数字。空欄はnull
+- sub=小分類ごとに {name:小分類名, stock:現在庫, plan:納品予定, items:「アイテム数」の総数の1便/2便/3便}
+- 小分類は画面に写っている分だけ含める。読み取れない値はnullにして、数字を推測で埋めない`;
+    navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
+      .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
+    return;
+  }
   const p=type==='mon'
     ? `あなたはコンビニ発注データの読み取りアシスタントです。添付した「日別時系列推移グラフ（中分類）」画面の写真から、当年の日別実績を読み取り、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
 #UPD1:{"type":"mon","days":[{"d":"8/17","ai":134,"n":134,"s":126,"ha":14}]}
@@ -1675,6 +1789,15 @@ function copyWeeklyPrompt(type){
     .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
 }
 function normName(s){return (s||'').replace(/[\s　・！!（）()]/g,'')}
+/* 売上ランキングの対象期間が何日分か。開始日と更新日から数える（当日は集計途中のため含めない） */
+function rankDays(from,upd){
+  const a=orderDateParts(from),b=orderDateParts(upd);
+  if(!a||!b)return 1;
+  const y=new Date().getFullYear();
+  const s=new Date(y,a.mo-1,a.da), e=new Date(y,b.mo-1,b.da);
+  const n=Math.round((e-s)/86400000);
+  return Math.max(1,Math.min(7,n));
+}
 /* 蓄積した週次スナップショットから、その商品の週販売数の推移を返す */
 function itemTrend(g,name){
   const nx=normName(name),out=[];
@@ -1768,8 +1891,75 @@ function importWeekly(){
       +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`
         +'（追加したい場合は「未登録の商品も追加する」にチェック）':'')
       +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
+  }else if(d.type==='rank'&&Array.isArray(d.items)){
+    /* 売上ランキング：商品名・売価・期間の販売/廃棄を取り込む。
+       この画面には値入率・納品数が無いため、それらは触らない */
+    const num=v=>(v==null||v==='')?null:Number(v);
+    const days=rankDays(d.from,d.upd);
+    let upd=0,added=0,dayFilled=0;
+    d.items.forEach(x=>{
+      if(!x.name)return;
+      const nx=normName(x.name);
+      let r=g.items.find(it=>{const ni=normName(it.name);return ni===nx||ni.includes(nx)||nx.includes(ni)});
+      const priceIn=num(x.price);
+      const taxOut=priceIn?Math.round(priceIn/1.08):null;   // 画面は税込表示。アプリは税抜で持つ
+      const rank={from:d.from||'',upd:d.upd||'',days,s:num(x.s),w:num(x.w)};
+      if(r){
+        if(!r.price&&taxOut)r.price=taxOut;                 // すでに入っている売価は上書きしない
+        if(x.code)r.code=String(x.code);
+        r.rank=rank;
+        if(!(r.day>0)&&rank.s!=null){r.day=Math.round(rank.s/days*10)/10;dayFilled++}
+        upd++;
+      }else{
+        const day=rank.s==null?0:Math.round(rank.s/days*10)/10;
+        if(day)dayFilled++;
+        g.items.push({id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),
+          name:x.name,price:taxOut||0,day,unit:1,grade:'○',my:0,tag:'',
+          code:x.code?String(x.code):undefined,
+          memo:'売上ランキング取込'+(day?`／日販は${d.from||''}からの${days}日分`:''),
+          rank});
+        added++;
+      }
+    });
+    g.wk.rank=today;
+    pushSnapshot(g,'rank',{gen:d.gen||'',from:d.from||'',upd:d.upd||'',days,items:d.items});
+    msg.className='note ok';
+    msg.textContent=`✓ ${g.name}：${added}品を追加、${upd}品を更新`
+      +(d.gen?`（${d.gen}）`:'')
+      +`／販売・廃棄は${d.from||'対象期間'}からの${days}日分として記録`
+      +(dayFilled?`、${dayFilled}品の日販を仮入力`:'')
+      +'。値入率はこの画面に無いため、設定の「ジャンル既定の値入率」か商品ごとに入れてください';
+  }else if(d.type==='mid'){
+    // 中分類総数：現在庫・納品予定・便別繰越を、いま開いている発注日のデータとして取り込む
+    const num=v=>(v==null||v==='')?null:Number(v);
+    const stock=num(d.stock), plan=num(d.plan);
+    if(stock==null&&plan==null&&!Array.isArray(d.carry)){
+      msg.className='note crit';msg.textContent='現在庫・納品予定・繰越のどれも読み取れていません。写真を撮り直すか、数字を手入力してください。';return;
+    }
+    if(stock!=null)g.cur.carry=stock;
+    if(plan!=null)g.cur.plan=plan;
+    if(Array.isArray(d.carry))g.cur.carryBin=[0,1,2].map(i=>num(d.carry[i]));
+    g.cur.stockSrc=`中分類総数${d.gen?'（'+d.gen+'）':''}${d.d?' '+d.d:''}`;
+    // 小分類の「アイテム数」合計。アプリに登録した商品がジャンル全体を網羅しているかの目安にする
+    const cnt=(Array.isArray(d.sub)?d.sub:[]).reduce((a,x)=>
+      a+(Array.isArray(x.items)?x.items.reduce((b,y)=>b+(Number(y)||0),0):0),0);
+    g.cur.stockItems=cnt||null;
+    g.wk.mid=today;
+    pushSnapshot(g,'mid',{gen:d.gen||'',d:d.d||'',stock,plan,carry:d.carry||null,sub:d.sub||null});
+    // 小分類の合計と中分類の数字が合うか検算し、合わない場合は読み取り違いとして知らせる
+    const sub=Array.isArray(d.sub)?d.sub:[];
+    const sum=(k)=>sub.reduce((a,x)=>a+(num(x[k])||0),0);
+    const warn=[];
+    if(sub.length&&stock!=null&&sum('stock')!==stock)warn.push(`小分類の現在庫合計${sum('stock')}個が中分類${stock}個と合いません`);
+    if(sub.length&&plan!=null&&sum('plan')!==plan)warn.push(`小分類の納品予定合計${sum('plan')}個が中分類${plan}個と合いません`);
+    msg.className=warn.length?'note warn':'note ok';
+    msg.textContent=(warn.length?'⚠ ':'✓ ')
+      +`${g.name}に現在庫${stock??'—'}個・納品予定${plan??'—'}個を取り込みました`
+      +(d.gen?`（中分類：${d.gen}）`:'')
+      +(sub.length?`／小分類${sub.length}件を記録`:'')
+      +(warn.length?`　※${warn.join('、')}。写真を確認してください`:'');
   }else{
-    msg.className='note crit';msg.textContent='typeがmon/tueのどちらでもありません。プロンプトをコピーし直して試してください。';return;
+    msg.className='note crit';msg.textContent='typeがmon/tue/mid/rankのどれでもありません。プロンプトをコピーし直して試してください。';return;
   }
   $('wkbox').value='';renderAll();autosave();
 }
@@ -1786,7 +1976,7 @@ function renderWeekly(){
     const w=document.createElement('div');w.className='row';
     const a=document.createElement('div');a.className='k';a.textContent=t.label;
     const b=document.createElement('div');b.className='v '+(wk[k]?'ok':'warn');
-    b.textContent=(wk[k]?`✓ ${wk[k]} 取込済`:'未取込')+'　'+t.guide;
+    b.textContent=(wk[k]?`✓ ${wk[k]} 取込済`:'未取込')+'　'+t.guide.replace('{gen}',g.name||'');
     w.append(a,b);el.appendChild(w)});
   // 蓄積状況（何週分たまっているか）
   const snap=g.snap||[];
@@ -1896,6 +2086,15 @@ $('dt').addEventListener('change',()=>{
 });
 $('wthr').addEventListener('input',()=>{
   G().cur.wthr=$('wthr').value;renderSetup();autosave()
+});
+/* 現在庫・納品予定は手入力もできる。写真取込で入った値もここに出る */
+[['stk','carry'],['stkp','plan']].forEach(([id,key])=>{
+  $(id).addEventListener('input',()=>{
+    const v=$(id).value;
+    G().cur[key]=v===''?null:Number(v);
+    if(v!=='')G().cur.stockSrc='手入力';
+    renderSetup();if(APP_TAB==='profit')renderProfit();autosave();
+  });
 });
 ['ai1','ai2','ai3'].forEach(id=>$(id).addEventListener('input',()=>{
   G().cur.ai=['ai1','ai2','ai3'].map(x=>$(x).value===''?null:Number($(x).value));
