@@ -870,6 +870,18 @@ let PF_ALL=false;
 const pfYen=v=>Math.round(v).toLocaleString();
 const pfQty=v=>(Math.round(v*10)/10).toString();
 
+/* 商品が店に並べる日数。商品のshelf → 廃棄区分D → ジャンルのshelf の順で見る。
+   D区分は「納品のD日後に廃棄」なので、D3なら3日ぶんとして短めに数える（D0は当日で1日） */
+function itemShelfDays(r,g){
+  g=g||G();
+  const rs=Number(r&&r.shelf);
+  if(rs>0)return{d:rs,src:`消費期限${rs}日`};
+  const d=Number(r&&r.dclass);
+  if(Number.isInteger(d)&&d>=0&&d<=6)return{d:Math.max(1,d),src:`D${d}`};
+  const gs=Number(g.shelf);
+  if(gs>0)return{d:gs,src:`ジャンルの消費期限${gs}日`};
+  return{d:1,src:'期限未設定のため1日'};
+}
 /* 1日あたりの需要のもと。日販を優先し、無ければ品揃え画面の週販売から日割りする */
 function pfDemandBase(r){
   if((r.day||0)>0)return{d:Number(r.day),src:'日販'+r.day+'個'};
@@ -914,7 +926,10 @@ function pfCalc(r){
   if(m==null)miss.push('値入率');
   if(!dem)miss.push('日販/週販売');
   if(miss.length)return{r,q:o.q,mode:o.mode,miss};
-  const D=dem.d*F.f*F.wf*F.cyc;
+  // その発注が売り切れるまでに使える日数。期限が長い商品は当日で廃棄にはならない
+  const sh=itemShelfDays(r,G());
+  const win=Math.max(1,sh.d,F.cyc);
+  const D=dem.d*F.f*F.wf*win;
   const now=pfMoney(o.q,D,wr?wr.rate:null,price,m);
   const unit=Math.max(1,Number(r.unit)||1);
   const floor=Math.max(0,Number(r.my)||0);   // 本部目安より下は候補にしない
@@ -923,7 +938,7 @@ function pfCalc(r){
     const c=pfMoney(x,D,wr?wr.rate:null,price,m);
     if(c.net>best.net+1)best=c;              // 1円未満の差では動かさない
   }
-  return{r,q:o.q,mode:o.mode,price,m,D,dem,wr,unit,floor,now,
+  return{r,q:o.q,mode:o.mode,price,m,D,dem,wr,unit,floor,now,sh,win,
     cut:best.q<o.q?{q:best.q,net:best.net,gain:best.net-now.net}:null};
 }
 
@@ -1021,7 +1036,8 @@ function renderProfit(){
     const n1=document.createElement('div');n1.className='nm1';
     const n1n=document.createElement('div');n1n.className='nm1-name';n1n.textContent=x.r.name;n1.appendChild(n1n);
     const n2=document.createElement('div');n2.className='nm2';
-    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}%`
+    n2.textContent=`${x.mode} / 売価${x.price}円 値入${x.m}% / ${x.sh.src}`
+      +(x.win>1?`＝${x.win}日ぶんで計算`:'')
       +(x.wr?` / 実績廃棄率${(x.wr.rate*100).toFixed(1)}%`:' / 実績廃棄データなし');
     if(x.wr&&x.wr.rate*100>=x.m)n2.className='nm2 nm2-warn';
     nm.append(n1,n2);
@@ -1036,6 +1052,8 @@ function renderProfit(){
   });
   const msg=$('pfMsg');
   const notes=[];
+  const noShelf=ok.filter(x=>x.sh.src==='期限未設定のため1日').length;
+  if(noShelf)notes.push(`期限（廃棄区分D）が未設定の商品${noShelf}品は1日で計算しています。品揃えマスターの「廃棄D」を入れると精度が上がります。`);
   if(none)notes.push(`発注数が0の商品${none}品は計算対象外です。`);
   notes.push('「抑え目安」は本部目安と発注単位を下回らない範囲で、差引がいちばん大きくなる数です。この画面では発注数を書き換えません。');
   msg.textContent=notes.join(' ');
@@ -1044,18 +1062,20 @@ function renderProfit(){
   const sample=list[0]||ok[0];
   const why=[
     ['使った入力値','売価・値入率・日販（商品設定）／週販売・週廃棄（品揃えマスター取込）／発注数（この画面の発注入力）',''],
-    ['需要見込みの式','需要見込み ＝ 日販 × 曜日係数 × 天気係数'+(F.cyc>1?' × 発注サイクル日数':''),''],
-    ['予想廃棄の式','予想廃棄数 ＝ 「発注数 − 需要見込み」と「発注数 × 実績廃棄率」の大きい方',''],
+    ['需要見込みの式','需要見込み ＝ 日販 × 曜日係数 × 天気係数 × 売り切るまでに使える日数（期限日数と発注サイクルの長い方）',''],
+    ['期限の見方','商品の消費期限 → 廃棄区分D（D3なら3日ぶん、D0は1日） → ジャンルの消費期限 の順で見る。どれも無ければ1日',''],
+    ['予想廃棄の式','予想廃棄数 ＝ 「発注数 − 需要見込み（期限内に売り切れない分）」と「発注数 × 実績廃棄率」の大きい方',''],
     ['金額の式','粗利 ＝ 予想販売数 × 売価 × 値入率 ／ 廃棄ロス ＝ 予想廃棄数 × 売価 ×（1−値入率）',''],
     ['1個あたりの分岐点','実績廃棄率が値入率(%)を超えている商品は、1個増やすほど廃棄ロスが粗利を上回る計算になります','']
   ];
   if(sample)why.push(['計算例',
     `${sample.r.name}：発注${sample.q}個・需要見込み${pfQty(sample.D)}個`
-    +`（${sample.dem.src}×${F.f.toFixed(2)}×${F.wf.toFixed(2)}${F.cyc>1?'×'+F.cyc+'日':''}）`
+    +`（${sample.dem.src}×${F.f.toFixed(2)}×${F.wf.toFixed(2)}${sample.win>1?'×'+sample.win+'日（'+sample.sh.src+'）':''}）`
     +` → 販売${pfQty(sample.now.sold)}個・廃棄${pfQty(sample.now.waste)}個`
     +` → 粗利${pfYen(sample.now.profit)}円 − 廃棄ロス${pfYen(sample.now.loss)}円 ＝ ${sample.now.net>=0?'+':''}${pfYen(sample.now.net)}円`,'']);
   why.push(['未確認・注意',
     '需要見込みは日販と係数からの推測です。実際の売れ方（時間帯・便別の在庫切れ・機会ロス）は含みません。'
+    +'現在庫は見ていないため、すでに在庫が積み上がっている商品は廃棄がこの計算より増えます。'
     +'廃棄ロスは原価ロスとして数えています。欠品による売り逃しは金額に入っていないため、抑え目安どおりに減らすと欠品する場合があります。','warn']);
   const W=$('pfWhy');W.textContent='';
   why.forEach(([k,v,st])=>{
