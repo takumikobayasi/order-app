@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082404">
+<link rel="stylesheet" href="style.css?v=2026082405">
 </head><body>
 
 <header>
@@ -89,6 +89,7 @@
 <button class="gh sm stoconai" onclick="fillFrom('i')">ストコンAIをコピー</button>
 <button class="gh sm" onclick="editItem(null)">＋商品</button>
 <button class="gh sm" onclick="openCatalog()">品揃えマスター</button>
+<button class="gh sm" onclick="openBulk()">まとめて入力</button>
 </div>
 <div id=itemPager class=item-pager hidden></div>
 <div class=hscrollrow>
@@ -195,6 +196,21 @@
 <button onclick="saveItem()">保存</button>
 <button class=gh onclick="document.getElementById('dItem').close()">閉じる</button>
 <button class=gh style="color:var(--crit)" onclick="delItem()">削除</button></div></dialog>
+
+<dialog id=dBulk>
+<h2>まとめて入力</h2>
+<p class=note>ひとつの項目だけを縦に並べて入力します。ストコンの画面を見ながら数字だけ入れていけます。</p>
+<div class=modes id=bulkModes></div>
+<div class=bulk-fill>
+<input id=bulkAll placeholder="例 32">
+<button class="gh sm" onclick="bulkFillEmpty()">空欄にまとめて入れる</button>
+<button class="gh sm" onclick="bulkFillAll()">全部に入れる</button>
+</div>
+<div id=bulkList class=bulk-list></div>
+<p class=note id=bulkMsg></p>
+<div class=btns style="margin-top:10px">
+<button onclick="saveBulk()">保存</button>
+<button class=gh onclick="document.getElementById('dBulk').close()">閉じる</button></div></dialog>
 
 <dialog id=dCatalog class=wide>
 <h2>品揃えマスター：<span id=catTitle></span></h2>

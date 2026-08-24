@@ -1312,6 +1312,84 @@ function saveCatalog(){
   });
   g.items.forEach((r,ix)=>{r.orderBins=[0,1,2].filter(i=>{const e=$(`catbody`).querySelector(`[data-cat="bin${i}"][data-ix="${ix}"]`);return e&&e.checked})});
   $('dCatalog').close();renderTabs();paintTotals();autosave();flash('品揃えマスターを保存しました')}
+/* ---------- まとめて入力（1項目だけを縦に並べて入れる） ---------- */
+const BULK_FIELDS={
+  margin:{label:'値入率',unit:'%',step:'0.1',hint:r=>r.price?`売価${r.price}円`:'売価未設定'},
+  day:{label:'日販',unit:'個',step:'0.1',hint:r=>r.memo&&r.memo.includes('仮')?r.memo:(r.price?`売価${r.price}円`:'')},
+  price:{label:'売価(税抜)',unit:'円',step:'1',hint:r=>r.code?`コード${r.code}`:''},
+  dclass:{label:'廃棄D',select:true,hint:r=>r.name.length>18?'':''},
+  my:{label:'本部目安',unit:'個',step:'1',hint:()=>''}
+};
+let BULK_F='margin';
+function openBulk(){
+  if(!G().items.length){alert('先に商品を登録してください');return}
+  BULK_F='margin';renderBulk();$('dBulk').showModal();
+}
+function setBulkField(f){
+  if(!BULK_FIELDS[f])return;
+  saveBulk(true);           // 切り替える前に、入力済みの値を保存する
+  BULK_F=f;$('bulkAll').value='';renderBulk();
+}
+function renderBulk(){
+  const g=G(),F=BULK_FIELDS[BULK_F];
+  const M=$('bulkModes');M.textContent='';
+  Object.entries(BULK_FIELDS).forEach(([k,v])=>{
+    const b=document.createElement('button');b.textContent=v.label;
+    b.setAttribute('aria-pressed',String(k===BULK_F));
+    b.onclick=()=>setBulkField(k);M.appendChild(b);
+  });
+  $('bulkAll').placeholder=BULK_F==='dclass'?'例 3':'例 '+(BULK_F==='margin'?'32':BULK_F==='day'?'2':'1');
+  const L=$('bulkList');L.textContent='';
+  g.items.forEach((r,ix)=>{
+    const row=document.createElement('div');row.className='bulk-row';
+    const nm=document.createElement('div');nm.className='bn';
+    nm.appendChild(document.createTextNode(r.name));
+    const h=F.hint?F.hint(r):'';
+    if(h){const sm=document.createElement('small');sm.textContent=h;nm.appendChild(sm)}
+    let inp;
+    if(F.select){
+      inp=document.createElement('select');
+      [['','—'],...DCLS.map(d=>[String(d),'D'+d])].forEach(([v,t])=>{
+        const o=document.createElement('option');o.value=v;o.textContent=t;inp.appendChild(o)});
+      inp.value=r.dclass==null?'':String(r.dclass);
+    }else{
+      inp=document.createElement('input');inp.type='number';inp.step=F.step||'1';
+      inp.inputMode='decimal';
+      inp.value=r[BULK_F]==null||r[BULK_F]===''?'':String(r[BULK_F]);
+      inp.placeholder=F.unit||'';
+    }
+    inp.dataset.ix=ix;
+    inp.addEventListener('input',()=>{row.classList.toggle('done',inp.value!=='')});
+    if(inp.value!=='')row.classList.add('done');
+    row.append(nm,inp);L.appendChild(row);
+  });
+  const filled=g.items.filter(r=>r[BULK_F]!=null&&r[BULK_F]!=='').length;
+  $('bulkMsg').textContent=`${F.label}：${filled}/${g.items.length}品 入力済み`;
+}
+/* 空欄だけ、または全部に同じ値を入れる（入力の手間を減らすため） */
+function bulkFill(onlyEmpty){
+  const v=$('bulkAll').value.trim();
+  if(v===''){$('bulkMsg').textContent='入れる値を左の欄に書いてください';return}
+  $('bulkList').querySelectorAll('[data-ix]').forEach(e=>{
+    if(onlyEmpty&&e.value!=='')return;
+    e.value=v;e.parentElement.classList.add('done');
+  });
+  $('bulkMsg').textContent=(onlyEmpty?'空欄に':'全部に')+`${v}を入れました。保存を押すと反映します`;
+}
+function bulkFillEmpty(){bulkFill(true)}
+function bulkFillAll(){bulkFill(false)}
+function saveBulk(keepOpen){
+  const g=G();let n=0;
+  $('bulkList').querySelectorAll('[data-ix]').forEach(e=>{
+    const r=g.items[+e.dataset.ix];if(!r)return;
+    const v=e.value.trim();
+    const now=v===''?undefined:Number(v);
+    if((r[BULK_F]??undefined)!==now){r[BULK_F]=now;n++}
+  });
+  if(!keepOpen){$('dBulk').close();flash(n?`${n}品を保存しました`:'変更はありません')}
+  renderItems();renderSetup();if(APP_TAB==='profit')renderProfit();autosave();
+  return n;
+}
 function delItem(){if(EDIT==null){$('dItem').close();return}
   if(!confirm('この商品を消しますか')) return;
   const r=G().items[EDIT];delete G().cur.v[r.id];G().items.splice(EDIT,1);
