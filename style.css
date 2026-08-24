@@ -178,3 +178,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #pfTbl .nmcell{max-width:200px}
 #pfWhy .row{grid-column:1/-1}
 #pfWhy .k{flex:0 0 108px}
+
+/* ジャンル切替の行（発注・利益廃棄・カメラ取り込みで表示） */
+#genRow{border-top:1px solid var(--grid)}
+#genRow .tabs{padding-top:6px}
+#genRow .tab{min-width:58px;padding:5px 10px}
+#genRow .tab .ic{font-size:17px}
+.chk{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--ink2);line-height:1.4}
+.chk input{width:auto;flex:0 0 auto;margin-top:2px}

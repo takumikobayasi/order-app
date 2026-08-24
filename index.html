@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082401">
+<link rel="stylesheet" href="style.css?v=2026082402">
 </head><body>
 
 <header>
@@ -13,6 +13,9 @@
 </div>
 <div class=hscrollrow>
 <div class="tabs" id=tabs></div>
+</div>
+<div class=hscrollrow id=genRow hidden>
+<div class="tabs" id=genTabs></div>
 </div>
 </header>
 
@@ -144,6 +147,7 @@
 </div>
 <div class=card>
 <h2>カメラ取り込み（写真→AI→貼り付け）</h2>
+<p class=note id=wkGen></p>
 <div id=wklist class=row-grid></div>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
@@ -151,6 +155,7 @@
 </div>
 <p class=note>コピーしたプロンプトを、撮った写真と一緒にAIチャット（ChatGPT・Gemini・Claudeなど何でもOK）に貼ると、取り込み用のデータが返ってきます。返ってきた「#UPD1:」で始まる文字列を下に貼り付けて「取り込む」を押してください。</p>
 <textarea id=wkbox placeholder="#UPD1:{...} をここに貼り付け"></textarea>
+<label class=chk style="margin-top:8px"><input type=checkbox id=wkAddNew onchange="this.dataset.touched=1"> 写真にある未登録の商品もこのジャンルに追加する（新しいジャンルの初回登録用）</label>
 <div class=btns style="margin-top:8px"><button class=sm onclick="importWeekly()">取り込む</button></div>
 <p class=note id=wkmsg></p>
 </div>

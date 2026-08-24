@@ -274,7 +274,11 @@ function cloudLoadSilent(){
     const localSynced=DB.syncedTs||0;
     if((data.ts||0)!==localSynced){
       const keepUrl=localStorage.getItem(GAS_KEY);
-      DB=data;DB.syncedTs=data.ts||0;ensureCategories();DB.active='onigiri';save();
+      const keepGen=DB.active;
+      DB=data;DB.syncedTs=data.ts||0;ensureCategories();
+      if(keepGen&&DB.g[keepGen])DB.active=keepGen;   // 見ていたジャンルを保つ
+      else if(!DB.active||!DB.g[DB.active])DB.active='onigiri';
+      save();
       if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();flash('☁️ 最新データを反映');
     }
@@ -523,20 +527,57 @@ function selectAppTab(tab){
   });
   document.querySelectorAll('#tabs .tab').forEach(b=>
     b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
-  $('title').textContent=tab==='onigiri'?'🍙 おむすび 発注':tab==='progress'?'発注進捗確認'
-    :tab==='profit'?'💰 利益・廃棄':'📷 カメラ取り込み';
+  const g=G(),gn=`${g.icon||''} ${g.name||''}`.trim();
+  $('title').textContent=tab==='onigiri'?`${gn} 発注`:tab==='progress'?'発注進捗確認'
+    :tab==='profit'?`💰 利益・廃棄（${g.name||''}）`:`📷 カメラ取り込み（${g.name||''}）`;
+  // ジャンルごとに中身が変わる画面だけ、ジャンル切替を出す
+  const row=$('genRow');if(row)row.hidden=(tab==='progress');
   if(tab==='profit')renderProfit();
   window.scrollTo(0,0);
 }
 function renderTabs(){const el=$('tabs');el.textContent='';
-  [['onigiri','🍙','おむすび'],['progress','📋','発注進捗確認'],['profit','💰','利益・廃棄'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
+  const cg=G();
+  [['onigiri',cg.icon||'🍙','発注'],['progress','📋','発注進捗確認'],['profit','💰','利益・廃棄'],['camera','📷','カメラ取り込み']].forEach(([key,ic,name])=>{
     const b=document.createElement('button');b.className='tab';b.dataset.tab=key;
     b.onclick=()=>selectAppTab(key);
     const a=document.createElement('div');a.className='ic';a.textContent=ic;
     const c=document.createElement('div');c.className='nm';c.textContent=name;
     b.append(a,c);el.appendChild(b);
   });
+  renderGenreTabs();
   selectAppTab(APP_TAB);
+}
+/* ジャンル切替。発注・利益廃棄・カメラ取り込みはジャンルごとの内容なので、
+   どのジャンルを見ているかを常に画面に出す */
+function renderGenreTabs(){
+  const el=$('genTabs');if(!el)return;el.textContent='';
+  GEN.forEach(([key,name,icon])=>{
+    const g=DB.g[key];if(!g)return;
+    const b=document.createElement('button');b.className='tab';b.dataset.gen=key;
+    b.setAttribute('aria-selected',String(key===DB.active));
+    b.onclick=()=>switchGenre(key);
+    const a=document.createElement('div');a.className='ic';a.textContent=g.icon||icon;
+    const c=document.createElement('div');c.className='nm';c.textContent=g.name||name;
+    const d=document.createElement('div');d.className='ct';d.textContent=(g.items||[]).length+'品';
+    b.append(a,c,d);el.appendChild(b);
+  });
+  // 選択中のジャンルが画面外にならないよう、行だけを横スクロールさせる
+  const sel=el.querySelector('.tab[aria-selected=true]');
+  if(sel)el.scrollLeft=Math.max(0,sel.offsetLeft-el.clientWidth/2+sel.offsetWidth/2);
+}
+function switchGenre(key){
+  if(!DB||!DB.g[key]||key===DB.active)return;
+  const dt=($('dt').value||'').trim(), wthr=($('wthr').value||'').trim();
+  saveOrderDateDraft();          // 切り替え前のジャンルに、入力途中の発注を残す
+  DB.active=key;ITEM_PAGE=0;
+  if(SORT)toggleSort();          // 並べ替えモードは持ち越さない
+  saveOrderDateDraft();          // 切替先ジャンルの入力も、そのジャンルの日付で残してから動かす
+  const g=G();
+  // 同じ納品日のまま次のジャンルを発注できるようにする（日付の入れ直し・取り違えを防ぐ）
+  if(orderDateParts(dt)&&g.cur.dt!==dt)loadOrderDate(dt);
+  if(!g.cur.wthr&&wthr)g.cur.wthr=wthr;   // 天気は同じ日ならジャンル共通
+  renderAll();save();
+  window.scrollTo(0,0);
 }
 
 function renderSetup(){
@@ -885,6 +926,7 @@ function renderProfit(){
     ? Object.entries(modeCnt).map(([k,v])=>`${k} ${v}品`).join(' / ')
     : '発注数が入っていません';
   const head=[
+    ['ジャンル',`${g.icon||''} ${g.name||''}（${g.items.length}品）`,''],
     ['納品日',($('dt').value||'').trim()||'未入力',($('dt').value||'').trim()?'':'warn'],
     ['発注数の出典',modeTxt,ok.length?'':'warn'],
     ['曜日係数',F.i?`${F.i.d}曜 ${F.f.toFixed(2)}（${F.i.src}）`:'納品日が未入力のため1.00で計算','' ],
@@ -927,7 +969,9 @@ function renderProfit(){
     w.append(a,b);S.appendChild(w)});
 
   const J=$('pfJudge');
-  if(!ok.length){J.className='note warn';J.textContent='計算できる商品がありません。発注数を入れるか、売価・値入率・日販を登録してください。'}
+  if(!g.items.length){J.className='note warn';
+    J.textContent=`${g.name}にはまだ商品が登録されていません。「カメラ取り込み」で品揃え画面の写真から登録するか、発注画面の「＋商品」で登録してください。`}
+  else if(!ok.length){J.className='note warn';J.textContent='計算できる商品がありません。発注数を入れるか、売価・値入率・日販を登録してください。'}
   else if(T.net<0){J.className='note crit';
     J.textContent=`廃棄ロス予想（${pfYen(T.loss)}円）が粗利予想（${pfYen(T.profit)}円）を上回っています。下の候補で発注を抑えることを検討してください。`}
   else if(T.gain>0){J.className='note warn';
@@ -1621,10 +1665,21 @@ function importWeekly(){
     g.hist.sort((a,b)=>{const p=s=>{const mm=(s.d||'').match(/(\d+)\D+(\d+)/);return mm?+mm[1]*100+ +mm[2]:0};return p(a)-p(b)});
     g.wk.mon=today;
     pushSnapshot(g,'mon',{days:d.days});
-    msg.className='note ok';msg.textContent=`✓ ${cnt}日分の実績を履歴に取り込みました（曜日係数・週平均の学習に使われます）`
+    msg.className='note ok';msg.textContent=`✓ ${g.name}に${cnt}日分の実績を履歴に取り込みました（曜日係数・週平均の学習に使われます）`
       +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
   }else if(d.type==='tue'&&Array.isArray(d.items)){
-    let upd=0,added=0;const miss=[];
+    let upd=0,added=0,dayFilled=0;const miss=[];
+    const addAll=!!($('wkAddNew')&&$('wkAddNew').checked);   // 商品未登録のジャンルを写真から作るとき用
+    /* 週販売数（4週）から1日あたりの販売数を出す。直近週を優先し、無ければ有効な週の平均。
+       実績から計算した値であり、勝手な想定値は入れない */
+    const dayFromWeek=ws=>{
+      if(!Array.isArray(ws))return null;
+      const v=ws.filter(n=>n!=null&&n>=0);
+      if(!v.length)return null;
+      const last=ws.slice().reverse().find(n=>n!=null&&n>0);
+      const base=last!=null?last:(v.reduce((a,b)=>a+b,0)/v.length);
+      return Math.round(base/7*10)/10;
+    };
     d.items.forEach(x=>{
       if(!x.name)return;
       const nx=normName(x.name);
@@ -1636,10 +1691,14 @@ function importWeekly(){
           const c=g.cur.v;c[r.id]=c[r.id]||{o:[null,null,null],i:[null,null,null],a:[null,null,null]};
           c[r.id].i=x.ai.map(v=>v||null)}
         upd++;
-      }else if(x.new){
+      }else if(x.new||addAll){
+        const day=dayFromWeek(x.ws);
+        if(day!=null)dayFilled++;
         const o={id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),
-          name:x.name,price:x.price?Math.round(x.price/1.08):0,day:0,unit:1,grade:'新',
-          my:0,tag:'新',memo:'週次取込で自動追加',margin:x.margin??undefined,
+          name:x.name,price:x.price?Math.round(x.price/1.08):0,day:day??0,unit:1,
+          grade:x.new?'新':'○',my:0,tag:x.new?'新':'',
+          memo:(x.new?'週次取込で自動追加':'写真取込で登録')+(day!=null?'／日販は週販売÷7の仮値':''),
+          margin:x.margin??undefined,
           pos:{sales:x.ws||null,waste:x.ww||null,ai:x.ai||null}};
         g.items.push(o);added++;
       }else miss.push(x.name);
@@ -1649,8 +1708,10 @@ function importWeekly(){
     pushSnapshot(g,'tue',{items:d.items.map(x=>({name:x.name,price:x.price??null,
       margin:x.margin??null,ai:x.ai||null,ws:x.ws||null,ww:x.ww||null}))});
     msg.className='note ok';
-    msg.textContent=`✓ ${upd}品を更新`+(added?`、新商品${added}品を追加`:'')
-      +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`:'')
+    msg.textContent=`✓ ${g.name}：${upd}品を更新`+(added?`、${added}品を追加`:'')
+      +(dayFilled?`（うち${dayFilled}品は日販を週販売÷7で仮入力。実態に合わせて商品設定で直してください）`:'')
+      +(miss.length?`　※未登録のため飛ばした商品: ${miss.slice(0,5).join('、')}${miss.length>5?' 他':''}`
+        +'（追加したい場合は「未登録の商品も追加する」にチェック）':'')
       +`　（${weekKey()}週として蓄積：計${(g.snap||[]).length}件）`;
   }else{
     msg.className='note crit';msg.textContent='typeがmon/tueのどちらでもありません。プロンプトをコピーし直して試してください。';return;
@@ -1660,6 +1721,12 @@ function importWeekly(){
 function renderWeekly(){
   const el=$('wklist');if(!el)return;el.textContent='';
   const g=G(),wk=g.wk||{};
+  // どのジャンルに取り込むかを取り違えないよう、貼り付け前に必ず表示する
+  const gen=$('wkGen');
+  if(gen){gen.textContent=`取り込み先ジャンル：${g.icon||''} ${g.name||''}（${(g.items||[]).length}品）　違う場合は上のジャンルタブで切り替えてください`;
+    gen.className=(g.items||[]).length?'note':'note warn'}
+  const add=$('wkAddNew');
+  if(add&&!add.dataset.touched)add.checked=!(g.items||[]).length;   // 商品ゼロのジャンルは初回登録として既定ON
   Object.entries(WK_TASKS).forEach(([k,t])=>{
     const w=document.createElement('div');w.className='row';
     const a=document.createElement('div');a.className='k';a.textContent=t.label;
@@ -1794,9 +1861,8 @@ if(!DB.g)DB=fresh();
   if(items===0&&hist===0)DB=fresh();
 })();
 ensureCategories();
-// 現在の通常画面は、いったんおむすびだけを表示する。
-// 他ジャンルのデータはDBに残し、設定・将来の再表示に備える。
-DB.active='onigiri';
+// 保存されているジャンルをそのまま開く。未設定・不明なジャンルのときだけおむすびに戻す。
+if(!DB.active||!DB.g[DB.active])DB.active='onigiri';
 cleanMemoDisplayTest();
 applyPhotoActualFix();
 initDriveImport();
