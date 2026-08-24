@@ -40,6 +40,23 @@ function cleanMemoDisplayTest(){
   if(changed)save();
 }
 /* 写真で確認できたおむすびの日別実績を一度だけ補完する。 */
+/* ジャンルごとの便構成の既定値を、すでにそのジャンルがある端末にも入れる。
+   ユーザーが設定済みの場合は上書きしない。
+   bins=そのジャンルで使う便（未指定なら1〜3便すべて） */
+const GEN_BIN_DEFAULTS={
+  dessert:{bins:[0,1],note:'ヤマパン＝1便／ファミマ＝2便のみ'},
+  hiyashi:{bins:[1,2],note:'2便・3便のみ'},
+  pasta:{note:'商品により1便・3便、または2便のみ（商品ごとに品揃えマスターで設定）'}
+};
+function applyGenreBinDefaults(){
+  let ch=false;
+  Object.entries(GEN_BIN_DEFAULTS).forEach(([k,d])=>{
+    const g=DB.g&&DB.g[k];if(!g)return;
+    if(d.bins&&!Array.isArray(g.bins)){g.bins=d.bins.slice();ch=true}
+    if(d.note&&!g.binNote){g.binNote=d.note;ch=true}
+  });
+  if(ch)save();
+}
 function applyPhotoActualFix(){
   if(DB.photoActualFixV1)return;
   const g=DB.g&&DB.g.onigiri;if(!g)return;
@@ -1172,12 +1189,13 @@ function saveItem(){const n=$('f_name').value.trim();if(!n){alert('商品名を�
 function catInput(type,value,field,ix){const e=document.createElement('input');e.type=type;e.value=value??'';e.dataset.cat=field;e.dataset.ix=ix;return e}
 function catSelect(options,value,field,ix){const e=document.createElement('select');options.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;e.appendChild(o)});e.value=value==null?'':String(value);e.dataset.cat=field;e.dataset.ix=ix;return e}
 function catBins(r,g,ix){const box=document.createElement('div');box.className='cat-bins';const a=itemBins(r,g);
-  [0,1,2].forEach(i=>{const lab=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=a.includes(i);cb.dataset.cat='bin'+i;cb.dataset.ix=ix;lab.append(cb,document.createTextNode((i+1)+'便'));box.appendChild(lab)});return box}
+  availBins(r,g).forEach(i=>{const lab=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=a.includes(i);cb.dataset.cat='bin'+i;cb.dataset.ix=ix;lab.append(cb,document.createTextNode((i+1)+'便'));box.appendChild(lab)});return box}
 function openCatalog(){renderCatalog();$('dCatalog').showModal()}
 function renderCatalog(){
   const g=G();$('catTitle').textContent=g.name;const tb=$('catbody');tb.textContent='';
-  if(!g.items.length){$('catmsg').textContent='商品がありません。「＋商品」から登録してください。';return}
-  $('catmsg').textContent='';
+  const bn=g.binNote?`便構成：${g.binNote}`:'';
+  if(!g.items.length){$('catmsg').textContent=(bn?bn+'　':'')+'商品がありません。「＋商品」から登録してください。';return}
+  $('catmsg').textContent=bn;
   const grades=[['◎','◎'],['○','○'],['△','△'],['×','×'],['新','新']],units=[['1','1個'],['2','2個']];
   g.items.forEach((r,ix)=>{const tr=document.createElement('tr');
     const fields=[catInput('text',r.name,'name',ix),catInput('number',r.price,'price',ix),catInput('number',r.day,'day',ix),
@@ -1455,23 +1473,40 @@ function binSummaryLines(g){
   }});
   return out}
 /* マスタに登録のある便だけを使う。未登録のジャンルは従来どおり1〜3便すべて */
+/* ジャンル全体で使う便（g.bins）。便と廃棄の時間マスタが未登録のジャンル用の既定値。
+   例：デザートは1便・2便しか入らない。未設定なら従来どおり1〜3便すべて */
+function genreBins(g){
+  const b=((g&&g.bins)||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<3);
+  return b.length?[...new Set(b)].sort((a,b)=>a-b):[0,1,2];
+}
+/* マスタに登録のある便を優先し、無ければジャンルの既定便を使う */
+function binsFromMaster(g){
+  const m=binmx(g),out=[];
+  for(let i=0;i<3;i++)if(m.dEnabled.some(d=>m.wasteD[d][i].t.length))out.push(i);
+  return out;
+}
 function itemBins(r,g){
   if(Array.isArray(r&&r.orderBins))return r.orderBins;
-  const m=binmx(g||G()),out=[];
-  for(let i=0;i<3;i++)if(m.dEnabled.some(d=>m.wasteD[d][i].t.length))out.push(i);
-  return out.length?out:[0,1,2];
+  g=g||G();
+  const out=binsFromMaster(g);
+  return out.length?out:genreBins(g);
 }
 function binsUsed(g){
   g=g||G();
   if(g.items&&g.items.some(r=>Array.isArray(r.orderBins))){
     const set=new Set();g.items.forEach(r=>itemBins(r,g).forEach(i=>set.add(i)));
-    return set.size?[...set].sort((a,b)=>a-b):[0,1,2];
+    return set.size?[...set].sort((a,b)=>a-b):genreBins(g);
   }
-  if(!g.binmx)return [0,1,2];
-  const m=binmx(g),out=[];
-  for(let i=0;i<3;i++){
-    if(m.dEnabled.some(d=>m.wasteD[d][i].t.length))out.push(i)}
-  return out.length?out:[0,1,2]}
+  if(!g.binmx)return genreBins(g);
+  const out=binsFromMaster(g);
+  return out.length?out:genreBins(g)}
+/* 品揃えマスターで選べる便。ジャンルで使う便と、その商品にすでに入っている便を出す */
+function availBins(r,g){
+  const base=binsFromMaster(g);
+  const set=new Set(base.length?base:genreBins(g));
+  if(Array.isArray(r&&r.orderBins))r.orderBins.forEach(i=>set.add(i));
+  return [...set].sort((a,b)=>a-b);
+}
 /* 便の見出しに廃棄時刻を添える（例「2便 14時廃棄」） */
 function itemDClass(r){const d=Number(r&&r.dclass);return Number.isInteger(d)&&d>=0&&d<=6?d:null}
 function binLabel(g,i,short,r){
@@ -1865,6 +1900,7 @@ ensureCategories();
 if(!DB.active||!DB.g[DB.active])DB.active='onigiri';
 cleanMemoDisplayTest();
 applyPhotoActualFix();
+applyGenreBinDefaults();
 initDriveImport();
 renderAll();save();
 cloudLoadSilent();
