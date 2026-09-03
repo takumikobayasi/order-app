@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
+const Storage=window.HacchuStorage;
 const DEFAULT_LOC={lat:36.1214,lon:139.6015,name:'加須市(埼玉県)'};
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwU6-Ut_7ChPXtVr5fOEq5iPd7m0G5VNkcMJ8g27XQ_aBv2t0S-WUJNtmtoUYDqyZ4V/exec';
 const PREVIOUS_GAS_URL = 'https://script.google.com/macros/s/AKfycbypnSUGdcjGtZIDdnKXZ5jCkmJ-G0wjjVBb8An-Chqyp-PDXXjoDEwTLVXdY36w2m74/exec';
@@ -73,11 +74,13 @@ function applyPhotoActualFix(){
   g.hist.sort((a,b)=>{const p=s=>{const m=(s.d||'').match(/(\d+)\D+(\d+)/);return m?+m[1]*100+ +m[2]:0};return p(a)-p(b)});
   DB.photoActualFixV1=true;DB.pendingSync=true;save();
 }
-function load(){try{const r=localStorage.getItem(KEY);if(r){DB=JSON.parse(b64d(r));return true}}catch(e){}
+let STORAGE_WARNING='';
+function load(){try{const result=Storage.loadDb();if(result.db){DB=result.db;STORAGE_WARNING=result.warning||'';return true}}
+  catch(e){STORAGE_WARNING=e.message||'保存データを読み取れませんでした'}
   return false}
-function save(){try{DB.ts=Date.now();localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
+function save(){try{Storage.saveDb(DB);
     $('st').textContent=(DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm()}
-  catch(e){$('st').textContent='保存エラー'}}
+  catch(e){$('st').textContent='保存エラー';console.error(e)}}
 function hm(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
 function flash(t){$('st').textContent=t;
   setTimeout(()=>$('st').textContent=(DB&&DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm(),2500)}
@@ -2187,15 +2190,13 @@ function outCompact(){const g=G(),s=sums('o'),ai=sums('i'),ac=sums('a');
   const h=g.hist.slice(-3).map(x=>`${x.d} 納${x.n??'-'} 販${x.s??'-'} 廃${x.ha??'-'}${x.w?' '+x.w:''}`);
   if(h.length)L.push('直近 '+h.join(' | '));
   $('out').value=L.join('\n')}
-function outFull(){$('out').value='#BK3:'+b64e(JSON.stringify(DB))}
+function outFull(){try{$('out').value=Storage.exportBackupText(DB)}catch(e){alert(e.message)}}
 function copyOut(){const t=$('out');if(!t.value){outCompact()}t.select();
   const done=()=>flash('コピーしました');
   if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(done).catch(()=>{document.execCommand('copy');done()});
   else{document.execCommand('copy');done()}}
-function doImport(){const m=$('impbox').value.match(/#BK3:([A-Za-z0-9+/=]+)/);
-  if(!m){alert('バックアップの文字列が見つかりません');return}
-  try{const d=JSON.parse(b64d(m[1]));if(!d.g)throw 0;DB=d;ensureCategories();save();$('dImp').close();$('impbox').value='';
-    renderAll();flash('読み込みました')}catch(e){alert('読み込めませんでした')}}
+function doImport(){try{const d=Storage.importBackupText($('impbox').value);DB=d;ensureCategories();save();$('dImp').close();$('impbox').value='';
+    renderAll();flash('読み込みました')}catch(e){alert(e.message||'読み込めませんでした')}}
 
 /* ---------- マウスドラッグで横スクロール（DeX等タッチ非対応環境向け） ---------- */
 function enableDragScroll(el){
@@ -2273,6 +2274,7 @@ applyPhotoActualFix();
 applyGenreBinDefaults();
 initDriveImport();
 renderAll();save();
+if(STORAGE_WARNING)setTimeout(()=>alert(STORAGE_WARNING),0);
 cloudLoadSilent();
 
 /* 画面離脱・バックグラウンド移行時の保存漏れ防止。
