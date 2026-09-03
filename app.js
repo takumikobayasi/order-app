@@ -236,6 +236,18 @@ function getGasUrl(){
 }
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
 
+function restoreLastLocalData(){
+  try{
+    const d=Storage.loadRecoveryDb();
+    const hist=Object.values(d.g||{}).reduce((a,g)=>a+((g.hist||[]).length),0);
+    const when=d.ts?new Date(d.ts).toLocaleString('ja-JP'):'時刻不明';
+    if(!confirm(`直前の端末データへ戻しますか？\n\n保存時刻: ${when}\n実績: ${hist}件\n\n現在の表示内容は直前バックアップへ退避されます。`))return;
+    DB=d;DB.pendingSync=true;ensureCategories();save();renderAll();
+    $('dSet').close();
+    alert('直前の端末データを復元しました。内容を確認するまで同期しないでください。');
+  }catch(e){alert(e.message||'直前データを復元できませんでした')}
+}
+
 async function cloudSave(){
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}

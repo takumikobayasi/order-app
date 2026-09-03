@@ -261,6 +261,8 @@
 <div class=btns><button class=sm onclick="saveGasUrl()">同期URLを保存</button>
 <button class="gh sm" onclick="cloudLoad()">クラウドから読み込む（復元）</button></div>
 <p class=note>設定するとスマホとiPadでボタン1つでデータ共有できます。</p>
+<div class=btns><button class="gh sm" onclick="restoreLastLocalData()">直前の端末データを復元</button></div>
+<p class=note>同期後に入力が見えなくなった場合だけ使用します。復元後は未同期状態になります。</p>
 <h2 style="margin-top:14px">天気の自動取得（店舗の地域）</h2>
 <div class="fg">
 <div><label>地域名</label><input id=loc_name placeholder="加須市 のように入力"></div>
@@ -357,5 +359,5 @@
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
 <script src="data.js?v=2026082501"></script>
-<script type="module" src="js/bootstrap.js?v=2026090301"></script>
+<script type="module" src="js/bootstrap.js?v=2026090302"></script>
 </body></html>

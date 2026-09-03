@@ -2,6 +2,7 @@ export const STORAGE_KEYS = Object.freeze({
   db: 'hacchu.db.v3',
   dbBackup: 'hacchu.db.v3.backup',
   dbCorrupt: 'hacchu.db.v3.corrupt',
+  dbRecovery: 'hacchu.db.v3.recovery',
   gasUrl: 'hacchu.gas.url',
   location: 'hacchu.loc',
   weather: 'hacchu.wx.v1'
@@ -79,6 +80,30 @@ export function loadDb(storage = localStorage) {
       warning: '通常の保存データが壊れていたため、直前のバックアップを読み込みました'
     };
   }
+}
+
+export function preserveRecoveryCandidate(storage = localStorage) {
+  try {
+    if (storage.getItem(STORAGE_KEYS.dbRecovery)) return false;
+    const backup = storage.getItem(STORAGE_KEYS.dbBackup);
+    if (!backup) return false;
+    const db = decodeDb(backup);
+    if (!validateDb(db).valid) return false;
+    storage.setItem(STORAGE_KEYS.dbRecovery, backup);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function loadRecoveryDb(storage = localStorage) {
+  const encoded = readEncoded(storage, STORAGE_KEYS.dbRecovery)
+    || readEncoded(storage, STORAGE_KEYS.dbBackup);
+  if (!encoded) throw new StorageError('RECOVERY_NOT_FOUND', '復元できる直前データがありません');
+  const db = decodeDb(encoded);
+  const check = validateDb(db);
+  if (!check.valid) throw new StorageError('INVALID_SCHEMA', '直前データの形式が正しくありません');
+  return db;
 }
 
 export function saveDb(db, storage = localStorage, now = Date.now()) {

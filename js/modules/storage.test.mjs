@@ -7,6 +7,8 @@ import {
   exportBackupText,
   importBackupText,
   loadDb,
+  loadRecoveryDb,
+  preserveRecoveryCandidate,
   saveDb,
   validateDb
 } from './storage.js';
@@ -56,6 +58,15 @@ test('主データ破損時は有効な直前バックアップを読む', () =>
   assert.equal(loaded.source, 'backup');
   assert.equal(loaded.db.active, 'onigiri');
   assert.ok(loaded.warning);
+});
+
+test('直前バックアップを上書きされない復旧枠へ保全する', () => {
+  const storage = new MemoryStorage();
+  const db = sampleDb();
+  storage.setItem(STORAGE_KEYS.dbBackup, encodeDb(db));
+  assert.equal(preserveRecoveryCandidate(storage), true);
+  storage.setItem(STORAGE_KEYS.dbBackup, encodeDb({ ...db, ts: 999 }));
+  assert.deepEqual(loadRecoveryDb(storage), db);
 });
 
 test('#BK3の書き出しと復元に互換性がある', () => {

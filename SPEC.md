@@ -22,7 +22,7 @@
   - `js/modules/storage.js` … v3 DBの読込・検証・保存・バックアップ入出力
 - キャッシュ対策として `index.html` は `style.css?v=YYYYMMDDHHMM` のようにクエリ文字列でバージョンを持つ。ファイルを更新したら必ずこの数字を更新する。
 - データはブラウザの `localStorage`（キー `hacchu.db.v3`、値はJSONをbase64化したもの）に保存し、Google Apps Script (GAS) 経由でクラウド同期する。DBサーバーは無い。
-- 保存時は直前の正常なDBを `hacchu.db.v3.backup` に退避する。主DBが破損している場合は `hacchu.db.v3.corrupt` に保全し、正常な直前バックアップがあればそこから起動する。
+- 保存時は直前の正常なDBを `hacchu.db.v3.backup` に退避する。主DBが破損している場合は `hacchu.db.v3.corrupt` に保全し、正常な直前バックアップがあればそこから起動する。同期などによる上書き事故へ備え、復旧候補を `hacchu.db.v3.recovery` に固定保全し、設定画面から手動復元できる。
 
 ## 2. データモデル
 
