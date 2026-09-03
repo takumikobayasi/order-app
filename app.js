@@ -13,6 +13,7 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0
 let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri', ITEM_PAGE=0;
 const ITEMS_PER_PAGE=6;
 let DRIVE_FILES=[];
+let LAST_CAPTURED_FILE=null, LAST_AI_PROMPT='';
 
 function blank(name,icon){return{name,icon,items:[],hist:[],tgt:{},dow:{...DOW0},rat:JSON.parse(JSON.stringify(RAT0)),
   base:0,up:1,cur:{dt:'',v:{}}}}
@@ -1807,6 +1808,7 @@ function addDriveFiles(files){
     if(existing.has(key))return;
     existing.add(key);
     DRIVE_FILES.push({file,category:'unclassified'});
+    if(file.type&&file.type.startsWith('image/'))LAST_CAPTURED_FILE=file;
   });
   renderDriveFiles();
 }
@@ -1867,6 +1869,7 @@ function copyWeeklyPrompt(type){
 - 1枚に2商品ずつ写っている場合は両方を、複数枚ある場合は全部の商品をitemsに入れる
 - 「売価 − 原価 ÷ 売価」が値入率とだいたい合うか確かめ、合わない行はcostとmarginをnullにする
 - 読み取れない値はnullにして、数字を推測で埋めない`;
+    LAST_AI_PROMPT=p;
     navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
       .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
     return;
@@ -1882,6 +1885,7 @@ function copyWeeklyPrompt(type){
 - 数量表示と金額表示の写真が両方ある場合は、数量表示のほうの数字を使う
 - 金額表示の写真があるときは「売価×数量＝金額」が合うか確かめ、合わない行はnullにする
 - 画面に写っている全商品を含め、読み取れない値はnullにして推測で埋めない`;
+    LAST_AI_PROMPT=p;
     navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
       .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
     return;
@@ -1895,6 +1899,7 @@ function copyWeeklyPrompt(type){
 - carry=「繰越」の行のうち、発注日の列にある1便/2便/3便の数字。空欄はnull
 - sub=小分類ごとに {name:小分類名, stock:現在庫, plan:納品予定, items:「アイテム数」の総数の1便/2便/3便}
 - 小分類は画面に写っている分だけ含める。読み取れない値はnullにして、数字を推測で埋めない`;
+    LAST_AI_PROMPT=p;
     navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
       .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
     return;
@@ -1914,8 +1919,25 @@ function copyWeeklyPrompt(type){
 - ws=週販売数（4週前→直近週の順）、ww=週廃棄数（同順）。空欄は0
 - ランクに「導入」や赤い導入マークがある商品は new を true に
 - 全ページの全商品を含め、読み取れない値はnull`;
+  LAST_AI_PROMPT=p;
   navigator.clipboard.writeText(p).then(()=>flash('プロンプトをコピーしました'))
     .catch(()=>{$('out').value=p;flash('下の書き出し枠からコピーしてください')});
+}
+async function sendWeeklyToChatGPT(){
+  const type=$('wkAiType')?.value||'mon';
+  copyWeeklyPrompt(type);
+  const file=LAST_CAPTURED_FILE||[...DRIVE_FILES].reverse().find(x=>x.file.type&&x.file.type.startsWith('image/'))?.file;
+  if(file&&navigator.share){
+    const payload={title:'発注データ読み取り',text:LAST_AI_PROMPT,files:[file]};
+    try{
+      if(!navigator.canShare||navigator.canShare({files:[file]})){
+        await navigator.share(payload);flash('写真とプロンプトを共有しました');return;
+      }
+    }catch(e){if(e&&e.name==='AbortError')return}
+  }
+  try{await navigator.clipboard.writeText(LAST_AI_PROMPT)}catch(e){}
+  window.open('https://chatgpt.com/','_blank','noopener');
+  alert(file?'写真の自動共有に対応していないため、プロンプトだけコピーしました。ChatGPTで写真を添付して貼り付けてください。':'先に上の「画像・PDFを選択」から写真を選んでください。プロンプトはコピーしました。');
 }
 function normName(s){return (s||'').replace(/[\s　・！!（）()]/g,'')}
 /* 売上ランキングの対象期間が何日分か。開始日と更新日から数える（当日は集計途中のため含めない） */
