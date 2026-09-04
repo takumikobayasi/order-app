@@ -270,7 +270,6 @@ async function cloudSave(){
 
 /* 同期＝端末保存＋クラウド保存を1ボタンで。失敗時は端末保存のままにして後で再同期 */
 async function syncCloud(){
-  setActionOrderDate();
   clearTimeout(sT);sT=null;
   saveOrderDateDraft();
   save();
@@ -289,7 +288,7 @@ async function syncCloud(){
     await fetch(url,{method:'POST',mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(DB)});
     save({dirty:false,now:syncTs});
-    flash('☁️ 同期完了 '+hm());
+    flash(`☁️ ${G().name} ${G().cur.dt||$('dt').value||''} 同期完了`);
   }catch(e){
     DB.pendingSync=true;save();
     flash('⚠ 端末に一時保存');
