@@ -5,11 +5,13 @@ import {
   decodeDb,
   encodeDb,
   exportBackupText,
+  hasUnsyncedChanges,
   importBackupText,
   loadDb,
   loadRecoveryDb,
   preserveRecoveryCandidate,
   saveDb,
+  shouldAcceptCloudDb,
   validateDb
 } from './storage.js';
 
@@ -76,4 +78,22 @@ test('#BK3の書き出しと復元に互換性がある', () => {
 
 test('v3でないデータを拒否する', () => {
   assert.equal(validateDb({ v: 2, active: 'onigiri', g: {} }).valid, false);
+});
+
+test('保存時刻が同期時刻より新しければ未同期と判定する', () => {
+  assert.equal(hasUnsyncedChanges({ ...sampleDb(), ts: 200, syncedTs: 100 }), true);
+  assert.equal(hasUnsyncedChanges({ ...sampleDb(), ts: 200, syncedTs: 200 }), false);
+  assert.equal(hasUnsyncedChanges({ ...sampleDb(), ts: 200, syncedTs: 200, pendingSync: true }), true);
+});
+
+test('端末に未同期変更があれば古いクラウドデータで上書きしない', () => {
+  const local = { ...sampleDb(), ts: 300, syncedTs: 200 };
+  const cloud = { ...sampleDb(), ts: 250, syncedTs: 250 };
+  assert.deepEqual(shouldAcceptCloudDb(local, cloud), { accept: false, reason: 'unsynced-local' });
+});
+
+test('初回端末ではクラウドデータを受け入れる', () => {
+  const local = { ...sampleDb(), ts: 300, syncedTs: 0, pendingSync: true };
+  const cloud = { ...sampleDb(), ts: 250, syncedTs: 250 };
+  assert.deepEqual(shouldAcceptCloudDb(local, cloud, { hadLocalDb: false }), { accept: true, reason: 'new-cloud' });
 });

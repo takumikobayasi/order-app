@@ -6,7 +6,7 @@ window.HacchuStorage = storage;
 storage.preserveRecoveryCandidate();
 
 const app = document.createElement('script');
-app.src = './app.js?v=2026090303';
+app.src = './app.js?v=2026090501';
 app.onerror = () => {
   const status = document.getElementById('st');
   if (status) status.textContent = 'アプリ読込エラー';

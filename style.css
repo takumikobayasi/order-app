@@ -186,6 +186,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #genRow .tab .ic{font-size:17px}
 .chk{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--ink2);line-height:1.4}
 .chk input{width:auto;flex:0 0 auto;margin-top:2px}
+.wk-sample{margin:12px 0 8px;padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--bg)}
+.wk-sample figcaption{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--ink)}
+.wk-sample img{display:block;width:100%;height:auto;border-radius:8px;background:#f4f7fb}
+.wk-sample .note{margin:8px 2px 0}
 
 /* まとめて入力：1項目だけを縦に並べる（横スクロールなしで入力できる） */
 #bulkModes{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%}

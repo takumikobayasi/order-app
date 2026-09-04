@@ -51,6 +51,23 @@ export function validateDb(db) {
   return { valid: errors.length === 0, errors };
 }
 
+export function hasUnsyncedChanges(db) {
+  if (!db || typeof db !== 'object') return false;
+  return db.pendingSync === true || Number(db.ts || 0) !== Number(db.syncedTs || 0);
+}
+
+export function shouldAcceptCloudDb(localDb, cloudDb, { hadLocalDb = true } = {}) {
+  if (!cloudDb || !validateDb(cloudDb).valid) return { accept: false, reason: 'invalid-cloud' };
+  const cloudItems = Object.values(cloudDb.g || {}).reduce((n, g) => n + ((g.items || []).length), 0);
+  const localItems = Object.values((localDb && localDb.g) || {}).reduce((n, g) => n + ((g.items || []).length), 0);
+  if (cloudItems === 0 && localItems > 0) return { accept: false, reason: 'empty-cloud' };
+  if (hadLocalDb && hasUnsyncedChanges(localDb)) return { accept: false, reason: 'unsynced-local' };
+  if (Number(cloudDb.ts || 0) === Number((localDb && localDb.syncedTs) || 0)) {
+    return { accept: false, reason: 'already-current' };
+  }
+  return { accept: true, reason: 'new-cloud' };
+}
+
 function readEncoded(storage, key) {
   try {
     return storage.getItem(key);

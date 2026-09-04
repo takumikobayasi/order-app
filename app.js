@@ -11,6 +11,7 @@ const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 
 let DB=null, MODE='o', SORT=false, EDIT=null, APP_TAB='onigiri', ITEM_PAGE=0;
+let BOOT_HAD_LOCAL_DB=false;
 const ITEMS_PER_PAGE=6;
 let DRIVE_FILES=[];
 let LAST_CAPTURED_FILE=null, LAST_AI_PROMPT='';
@@ -79,7 +80,10 @@ let STORAGE_WARNING='';
 function load(){try{const result=Storage.loadDb();if(result.db){DB=result.db;STORAGE_WARNING=result.warning||'';return true}}
   catch(e){STORAGE_WARNING=e.message||'保存データを読み取れませんでした'}
   return false}
-function save(){try{Storage.saveDb(DB);
+function save(options={}){try{
+    const dirty=options.dirty!==false;
+    if(dirty)DB.pendingSync=true;
+    Storage.saveDb(DB,localStorage,options.now||Date.now());
     $('st').textContent=(DB.ts!==DB.syncedTs?'未同期 ':'保存 ')+hm()}
   catch(e){$('st').textContent='保存エラー';console.error(e)}}
 function hm(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
@@ -267,6 +271,8 @@ async function cloudSave(){
 /* 同期＝端末保存＋クラウド保存を1ボタンで。失敗時は端末保存のままにして後で再同期 */
 async function syncCloud(){
   setActionOrderDate();
+  clearTimeout(sT);sT=null;
+  saveOrderDateDraft();
   save();
   const url=getGasUrl();
   if(!url){alert('先に「設定」からGASウェブアプリURLを登録してください');dlg('dSet');return}
@@ -278,10 +284,11 @@ async function syncCloud(){
   }
   $('st').textContent='同期中...';
   try{
-    DB.pendingSync=false;DB.ts=Date.now();DB.syncedTs=DB.ts;
+    const syncTs=Date.now();
+    DB.pendingSync=false;DB.ts=syncTs;DB.syncedTs=syncTs;
     await fetch(url,{method:'POST',mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(DB)});
-    localStorage.setItem(KEY,b64e(JSON.stringify(DB)));
+    save({dirty:false,now:syncTs});
     flash('☁️ 同期完了 '+hm());
   }catch(e){
     DB.pendingSync=true;save();
@@ -300,18 +307,15 @@ function cloudLoadSilent(){
   window[cb]=function(data){
     delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);
     if(!data||!data.g)return;
-    const cloudItems=Object.values(data.g).reduce((a,g)=>a+((g.items||[]).length),0);
-    const localItems=Object.values(DB.g||{}).reduce((a,g)=>a+((g.items||[]).length),0);
-    if(cloudItems===0&&localItems>0)return; // 空データで端末を上書きしない
-    if(DB.pendingSync&&localItems>0)return; // 未同期の変更が端末にある場合は上書きしない
-    const localSynced=DB.syncedTs||0;
-    if((data.ts||0)!==localSynced){
+    const decision=Storage.shouldAcceptCloudDb(DB,data,{hadLocalDb:BOOT_HAD_LOCAL_DB});
+    if(decision.accept){
       const keepUrl=localStorage.getItem(GAS_KEY);
       const keepGen=DB.active;
-      DB=data;DB.syncedTs=data.ts||0;ensureCategories();
+      const cloudTs=data.ts||Date.now();
+      DB=data;DB.ts=cloudTs;DB.syncedTs=cloudTs;DB.pendingSync=false;ensureCategories();
       if(keepGen&&DB.g[keepGen])DB.active=keepGen;   // 見ていたジャンルを保つ
       else if(!DB.active||!DB.g[DB.active])DB.active='onigiri';
-      save();
+      save({dirty:false,now:cloudTs});
       if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();flash('☁️ 最新データを反映');
     }
@@ -349,9 +353,11 @@ function cloudLoad(){
       const keepUrl=localStorage.getItem(GAS_KEY);
       DB = data;
       ensureCategories();
-      DB.syncedTs = data.ts||0;
+      const cloudTs=data.ts||Date.now();
+      DB.ts=cloudTs;
+      DB.syncedTs = cloudTs;
       DB.pendingSync = false;
-      save();
+      save({dirty:false,now:cloudTs});
       if(keepUrl)localStorage.setItem(GAS_KEY,keepUrl);
       renderAll();
       $('dSet').close();
@@ -460,14 +466,42 @@ function weatherFactor(t,r){t=(t||'').trim();if(!t)return 1;
   if(/曇/.test(t))return 0.97;
   if(/晴/.test(t))return 1.05;
   return 1}
+function learnedDemandBase(g){
+  const today=(()=>{const d=new Date();return (d.getMonth()+1)+'/'+d.getDate()})();
+  const daily=(g.hist||[]).filter(h=>h.s!=null&&h.d!==today&&!specialPeriod(h.d)).slice(-28).map(h=>Number(h.s)).filter(Number.isFinite);
+  if(daily.length>=7){
+    const avg=daily.reduce((a,b)=>a+b,0)/daily.length;
+    return{value:+avg.toFixed(1),source:`日別販売実績${daily.length}日から学習`,kind:'daily'};
+  }
+  const tue=(g.snap||[]).filter(s=>s.type==='tue'&&Array.isArray(s.items)).slice(-1)[0];
+  if(tue){
+    const values=tue.items.map(x=>Array.isArray(x.ws)?Number(x.ws[x.ws.length-1]):NaN).filter(Number.isFinite);
+    if(values.length){
+      const weekly=values.reduce((a,b)=>a+b,0);
+      return{value:+(weekly/7).toFixed(1),source:`${tue.week}週の商品販売${values.length}品から学習`,kind:'weekly'};
+    }
+  }
+  const manual=Number(g.base)||0;
+  return manual?{value:manual,source:'設定の基準日販',kind:'manual'}:null;
+}
+function forecastReadiness(g){
+  const hist=(g.hist||[]).filter(h=>h.s!=null).length;
+  const weeks=[...new Set((g.snap||[]).filter(s=>s.type==='tue').map(s=>s.week))].length;
+  const items=(g.items||[]).length;
+  const withDay=(g.items||[]).filter(r=>Number(r.day)>0||itemTrend(g,r.name).length).length;
+  const base=learnedDemandBase(g);
+  return{hist,weeks,items,withDay,base,ready:!!(base&&items&&withDay)};
+}
 function demand(){
   const g=G(),i=dowInfo();if(!i)return null;
-  let b=Number(g.base)||0; if(!b)return null;
+  const learned=learnedDemandBase(g);if(!learned)return null;
+  const b=learned.value;
   let up=Number(g.up)||1;
   if(DB.active==='chilled'&&i.d==='月'){up*=1.5}
   const wf=weatherFactor($('wthr').value,i.r);
   return{q:Math.round(b*i.f*up*wf),
-    src:`週平均${b}個 × ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')+(wf!==1?` × 天気${wf.toFixed(2)}`:'')}}
+    src:`基準日販${b}個（${learned.source}）× ${i.d}曜${i.f.toFixed(2)}`+(up!==1?` × 倍率${up.toFixed(2)}`:'')+(wf!==1?` × 天気${wf.toFixed(2)}`:''),
+    learned}}
 function applyDow(){const i=dowInfo();if(!i)return null;
   $('r1').value=i.r[0];$('r2').value=i.r[1];$('r3').value=i.r[2];
   // 使わない便は配分欄も隠し、その分を0にして他の便へ回す
@@ -630,6 +664,7 @@ function switchGenre(key){
 function renderSetup(){
   const g=G(),i=dowInfo(),k=tgtKey(),t=k?g.tgt[k]:null,s=sums('o');
   const D=demand(); const dem=D?D.q:null, demSrc=D?D.src:'';
+  const readiness=forecastReadiness(g);
   const aiAdp=getAiAdoption();
   if(t){if(!$('tq').value)$('tq').value=t.q;if(!$('ta').value)$('ta').value=t.a}
   const sp=specialPeriod($('dt').value);
@@ -639,6 +674,9 @@ function renderSetup(){
     ['便構成比',i?`${i.type} ${i.r[0]}/${i.r[1]}/${i.r[2]}%`:'—',i?'ok':'warn'],
     ['提案の採用率',aiAdp?`${aiAdp.rate}% (${aiAdp.match}/${aiAdp.total}品) - ${aiAdp.label}`:'提案がまだありません',aiAdp?aiAdp.cls:'warn'],
     ['本部目標',t?`${t.q}個 / ${(t.a||0).toLocaleString()}円`:(k?k+'は未登録':'—'),t?'':'warn'],
+    ['蓄積データ',readiness.ready
+      ? `予測可能：販売実績${readiness.hist}日・週次${readiness.weeks}週・商品データ${readiness.withDay}/${readiness.items}品（${readiness.base.source}）`
+      : `データ不足：販売実績${readiness.hist}日・週次${readiness.weeks}週・商品データ${readiness.withDay}/${readiness.items}品`,readiness.ready?'ok':'warn'],
     ['今日の需要見込み（提案数）',dem?`${dem}個（${demSrc}）`:'—',dem?'':'warn'],
     ['提案中',s.T?`${s.n}品 ${s.T}個 ${s.amt.toLocaleString()}円（${s.b.join('/')}）`:'まだ空です',s.T?'ok':'warn']
   ];
@@ -810,7 +848,7 @@ function renderItems(){
       };
       // 表全体を作り直すとフォーカスが外れモバイルのキーボードが閉じてしまうため、
       // 変更のあった行の合計と合計行だけを更新する
-      inp.onchange=e=>{const x=e.target.value===''?null:Number(e.target.value);
+      inp.oninput=e=>{const x=e.target.value===''?null:Number(e.target.value);
         setV(r.id,MODE,i,x);
         const badUnit=(r.unit||1)>1&&x!=null&&x%r.unit!==0;
         inp.classList.toggle('bad-unit',badUnit);
@@ -1858,6 +1896,27 @@ const WK_TASKS={
   rank:{label:'商品登録：売上ランキングの写真',
     guide:'ストコン「店舗分析→売上ランキング（{gen}）」を数量と金額の両方で撮影。商品名・売価・販売数・廃棄数を取り込む'}
 };
+const WK_SAMPLES={
+  mon:{title:'月曜：日別時系列推移グラフ',cols:['日付','AI推奨','納品','販売','廃棄'],rows:[['8/24','134','134','126','14'],['8/25','128','130','121','9']],note:'中分類名と日付が見える状態で、数量表示を1枚撮影します。集計途中の当日と未来日は不要です。'},
+  tue:{title:'火曜：品揃え状況確認・修正',cols:['商品名','売価','値入率','AI推奨','週販売／廃棄'],rows:[['商品A','198','40.4%','4／2／0','40／2'],['商品B','238','38.0%','3／1／0','32／1']],note:'商品名から4週分の販売・廃棄まで見えるように撮影します。複数ページは全ページ必要です。'},
+  mid:{title:'発注前：中分類総数',cols:['区分','現在庫','納品予定','1便','2便','3便'],rows:[['中分類計','71','38','14','—','—'],['小分類A','34','7','7','12','0']],note:'発注日、中分類名、現在庫、納品予定、便別繰越が一緒に見える状態で撮影します。'},
+  rank:{title:'商品登録：売上ランキング',cols:['商品名','商品コード','売価','販売','廃棄'],rows:[['商品A','19401450','334','7','0'],['商品B','19401451','298','5','1']],note:'対象期間と更新日時が見える状態で、「数量」と「金額」の表示をそれぞれ撮影します。'},
+  newp:{title:'新商品：新商品案内明細',cols:['商品名','売価','原価','値入率','商品コード','入数'],rows:[['新商品A','198','125.25','36.7%','0410113','1'],['新商品B','248','156.24','37.0%','0410114','1']],note:'日付と発注開始日を含め、1枚に写る商品をすべて撮影します。'}
+};
+function renderWeeklySample(type){
+  const s=WK_SAMPLES[type]||WK_SAMPLES.mon;
+  const W=720,H=250,left=18,top=76,rowH=48;
+  const colW=(W-left*2)/s.cols.length;
+  const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let cells='';
+  s.cols.forEach((v,i)=>{cells+=`<rect x="${left+i*colW}" y="${top}" width="${colW}" height="36" fill="#e8eef8" stroke="#9aa9bd"/><text x="${left+i*colW+colW/2}" y="${top+23}" text-anchor="middle" font-size="13" font-weight="700" fill="#26364a">${esc(v)}</text>`});
+  s.rows.forEach((row,r)=>row.forEach((v,i)=>{const y=top+36+r*rowH;cells+=`<rect x="${left+i*colW}" y="${y}" width="${colW}" height="${rowH}" fill="white" stroke="#c7d0dc"/><text x="${left+i*colW+colW/2}" y="${y+29}" text-anchor="middle" font-size="13" fill="#26364a">${esc(v)}</text>`}));
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" rx="14" fill="#f4f7fb"/><rect x="12" y="12" width="696" height="44" rx="7" fill="#1e4f91"/><text x="28" y="40" font-family="sans-serif" font-size="18" font-weight="700" fill="white">ストコン画面例　${esc(s.title)}</text>${cells}<rect x="10" y="68" width="700" height="150" rx="8" fill="none" stroke="#ef4444" stroke-width="5" stroke-dasharray="10 6"/><text x="700" y="240" text-anchor="end" font-family="sans-serif" font-size="12" fill="#c92a2a">赤枠が写真に入るように撮影</text></svg>`;
+  $('wkSampleTitle').textContent=s.title+' の撮影例';
+  $('wkSampleImg').src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  $('wkSampleImg').alt=s.title+'で写真に含める項目のサンプル';
+  $('wkSampleNote').textContent=s.note+' ※実際のストコン画像ではなく説明用の模式図です。';
+}
 function copyWeeklyPrompt(type){
   if(type==='newp'){
     const p=`あなたはコンビニ発注データの読み取りアシスタントです。添付した「新商品案内明細」画面の写真から、次の形式の1行だけを出力してください（説明文・前置きは一切不要）。
@@ -2169,12 +2228,13 @@ function renderWeekly(){
   // 蓄積状況（何週分たまっているか）
   const snap=g.snap||[];
   const weeks=[...new Set(snap.map(s=>s.week))];
+  const readiness=forecastReadiness(g);
   const w=document.createElement('div');w.className='row';
   const a=document.createElement('div');a.className='k';a.textContent='蓄積データ';
-  const b=document.createElement('div');b.className='v '+(weeks.length?'ok':'');
-  b.textContent=weeks.length
-    ? `${weeks.length}週分（${weeks.slice(-4).join('・')}${weeks.length>4?' 他':''}）取り込むほど精度が上がります`
-    : 'まだありません。取り込むと週ごとに蓄積されます';
+  const b=document.createElement('div');b.className='v '+(readiness.ready?'ok':'warn');
+  b.textContent=(readiness.ready?'✓ 発注予測に使用中':'予測に必要なデータが不足')
+    +`　販売実績${readiness.hist}日／週次${readiness.weeks}週／商品データ${readiness.withDay}/${readiness.items}品`
+    +(readiness.base?`　基準：${readiness.base.source}`:'');
   w.append(a,b);el.appendChild(w);
 }
 
@@ -2291,7 +2351,8 @@ $('aiver').addEventListener('change',()=>{G().cur.aiVer=$('aiver').value;renderS
 ['h_n1','h_n2','h_n3','h_s1','h_s2','h_s3','h_ha1','h_ha2','h_ha3'].forEach(id=>$(id).addEventListener('input',()=>{
   updateHistTotals();saveHistDateDraft();
 }));
-if(!load())DB=fresh();
+BOOT_HAD_LOCAL_DB=load();
+if(!BOOT_HAD_LOCAL_DB)DB=fresh();
 if(!DB.g)DB=fresh();
 /* 保存データが空(商品0件かつ履歴0件)なら初期データから復旧する。
    キャッシュ削除などでデータが失われても商品マスタが戻るようにする */
@@ -2307,7 +2368,8 @@ cleanMemoDisplayTest();
 applyPhotoActualFix();
 applyGenreBinDefaults();
 initDriveImport();
-renderAll();save();
+renderWeeklySample($('wkAiType')?.value||'mon');
+renderAll();save({dirty:false,now:DB.ts||Date.now()});
 if(STORAGE_WARNING)setTimeout(()=>alert(STORAGE_WARNING),0);
 cloudLoadSilent();
 

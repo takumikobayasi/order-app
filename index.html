@@ -2,7 +2,7 @@
 <meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>発注アプリ v3.6.7 (Clean UI)</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026082406">
+<link rel="stylesheet" href="style.css?v=2026090501">
 </head><body>
 
 <header>
@@ -149,7 +149,7 @@
 <p class=note id=wkGen></p>
 <div id=wklist class=row-grid></div>
 <div class="fg g2" style="margin-top:8px">
-<div><label>読み取る画面</label><select id=wkAiType>
+<div><label>読み取る画面</label><select id=wkAiType onchange="renderWeeklySample(this.value)">
 <option value=mon>日別時系列推移グラフ</option>
 <option value=tue>品揃え状況確認・修正</option>
 <option value=mid>中分類総数</option>
@@ -158,6 +158,11 @@
 </select></div>
 <div><label>写真と指示をまとめて送る</label><button class=sm onclick="sendWeeklyToChatGPT()">ChatGPTへ共有</button></div>
 </div>
+<figure class=wk-sample>
+<figcaption id=wkSampleTitle></figcaption>
+<img id=wkSampleImg alt="撮影するストコン画面のサンプル">
+<p class=note id=wkSampleNote></p>
+</figure>
 <p class=note>上で選択した直前の写真と、画面に合った読み取り指示をAndroidの共有画面へまとめて渡します。共有先でChatGPTを選んでください。</p>
 <div class=btns style="margin-top:8px">
 <button class="gh sm" onclick="copyWeeklyPrompt('mon')">月曜用プロンプトをコピー</button>
@@ -370,5 +375,5 @@
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
 <script src="data.js?v=2026082501"></script>
-<script type="module" src="js/bootstrap.js?v=2026090303"></script>
+<script type="module" src="js/bootstrap.js?v=2026090501"></script>
 </body></html>
