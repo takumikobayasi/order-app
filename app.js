@@ -241,6 +241,33 @@ function getGasUrl(){
 }
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
 
+function fetchCloudDb(timeoutMs=10000){
+  return new Promise((resolve,reject)=>{
+    const url=getGasUrl();
+    const cb='gasVerify_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');let done=false;
+    const finish=(fn,value)=>{if(done)return;done=true;clearTimeout(timer);delete window[cb];if(script.parentNode)script.parentNode.removeChild(script);fn(value)};
+    const timer=setTimeout(()=>finish(reject,new Error('クラウド確認がタイムアウトしました')),timeoutMs);
+    window[cb]=data=>finish(resolve,data);
+    script.onerror=()=>finish(reject,new Error('クラウド確認に失敗しました'));
+    script.src=url+(url.includes('?')?'&':'?')+'callback='+cb+'&t='+Date.now();
+    document.body.appendChild(script);
+  });
+}
+
+async function verifyCloudSave(expectedTs){
+  let lastError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const data=await fetchCloudDb(8000);
+      if(data&&Number(data.ts)===Number(expectedTs))return data;
+      lastError=new Error('クラウドの更新時刻が一致しません');
+    }catch(e){lastError=e}
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,700));
+  }
+  throw lastError||new Error('クラウド保存を確認できませんでした');
+}
+
 function restoreLastLocalData(){
   try{
     const d=Storage.loadRecoveryDb();
@@ -284,15 +311,24 @@ async function syncCloud(){
   $('st').textContent='同期中...';
   try{
     const syncTs=Date.now();
-    DB.pendingSync=false;DB.ts=syncTs;DB.syncedTs=syncTs;
+    const localTs=DB.ts;
+    const payload=JSON.parse(JSON.stringify(DB));
+    payload.pendingSync=false;payload.ts=syncTs;payload.syncedTs=syncTs;
     await fetch(url,{method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(DB)});
+      headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+    await verifyCloudSave(syncTs);
+    if(DB.ts!==localTs){
+      DB.pendingSync=true;save();
+      flash('⚠ 同期中の新しい入力が未同期です');
+      return;
+    }
+    DB.pendingSync=false;DB.ts=syncTs;DB.syncedTs=syncTs;
     save({dirty:false,now:syncTs});
-    flash(`☁️ ${G().name} ${G().cur.dt||$('dt').value||''} 同期完了`);
+    flash(`☁️ ${G().name} ${G().cur.dt||$('dt').value||''} 同期確認済み`);
   }catch(e){
     DB.pendingSync=true;save();
-    flash('⚠ 端末に一時保存');
-    alert('クラウドに接続できませんでした。データは端末に一時保存されています。通信が戻ったらもう一度「☁️ 同期」を押してください。');
+    flash('⚠ 端末保存済み・クラウド未確認');
+    alert('クラウドへの保存を確認できませんでした。入力内容はこの端末に保存されています。通信を確認して、もう一度「☁️ 同期」を押してください。');
   }
 }
 
