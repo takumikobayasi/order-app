@@ -277,6 +277,14 @@
 <div class=btns><button class=sm onclick="saveGasUrl()">同期URLを保存</button>
 <button class="gh sm" onclick="cloudLoad()">クラウドから読み込む（復元）</button></div>
 <p class=note>設定するとスマホとiPadでボタン1つでデータ共有できます。</p>
+<h2 style="margin-top:14px">Drive商品データ読取</h2>
+<div class="fg">
+<div><label>読取パス</label><input id=catalog_path placeholder="発注アプリ資料/2026-09/構造化データ/商品マスタ.json"></div>
+<div><label>アクセスキー</label><input id=catalog_token type=password autocomplete=off placeholder="GASのスクリプトプロパティと同じ値"></div>
+</div>
+<div class=btns><button class="gh sm" onclick="saveCatalogSource()">読取設定を保存</button>
+<button class=sm id=catalogLoadBtn onclick="loadDriveCatalog()">商品名・価格・値入率を読み込む</button></div>
+<p class=note id=catalog_status>アクセスキーはこの端末だけに保存され、GitHubやクラウドDBには含まれません。</p>
 <div class=btns><button class="gh sm" onclick="restoreLastLocalData()">直前の端末データを復元</button></div>
 <p class=note>同期後に入力が見えなくなった場合だけ使用します。復元後は未同期状態になります。</p>
 <h2 style="margin-top:14px">天気の自動取得（店舗の地域）</h2>
@@ -375,5 +383,5 @@
 <button class=gh onclick="document.getElementById('dImp').close()">閉じる</button></div></dialog>
 
 <script src="data.js?v=2026082501"></script>
-<script type="module" src="js/bootstrap.js?v=2026090503"></script>
+<script type="module" src="js/bootstrap.js?v=2026090504"></script>
 </body></html>

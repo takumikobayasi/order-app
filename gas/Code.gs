@@ -11,6 +11,8 @@ const UPLOAD_CATEGORIES = {
 
 function doGet(e) {
   const cb = e && e.parameter ? e.parameter.callback : null;
+  const mode = e && e.parameter ? e.parameter.mode : null;
+  if (mode === "catalog") return catalogResponse_(e, cb);
   let content = "{}";
 
   const files = DriveApp.getFilesByName(FILE_NAME);
@@ -22,6 +24,40 @@ function doGet(e) {
   }
   return ContentService.createTextOutput(content)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function catalogResponse_(e, cb) {
+  try {
+    const expected = PropertiesService.getScriptProperties().getProperty("CATALOG_ACCESS_TOKEN");
+    const actual = e && e.parameter ? String(e.parameter.token || "") : "";
+    if (!expected || actual !== expected) return jsonpResponse_({ok:false,error:"アクセスキーが違います"}, cb);
+
+    const path = e && e.parameter ? String(e.parameter.path || "") : "";
+    const parts = path.split("/").filter(Boolean);
+    if (parts.length < 2 || parts[0] !== UPLOAD_ROOT_NAME || parts.some(x => x === "." || x === "..") || !/\.json$/i.test(parts[parts.length - 1])) {
+      return jsonpResponse_({ok:false,error:"読取パスが正しくありません"}, cb);
+    }
+    let folder = DriveApp.getRootFolder();
+    for (let i = 0; i < parts.length - 1; i++) {
+      const folders = folder.getFoldersByName(parts[i]);
+      if (!folders.hasNext()) return jsonpResponse_({ok:false,error:"フォルダが見つかりません"}, cb);
+      folder = folders.next();
+    }
+    const files = folder.getFilesByName(parts[parts.length - 1]);
+    if (!files.hasNext()) return jsonpResponse_({ok:false,error:"商品データが見つかりません"}, cb);
+    const data = JSON.parse(files.next().getBlob().getDataAsString("UTF-8"));
+    return jsonpResponse_(data, cb);
+  } catch (err) {
+    return jsonpResponse_({ok:false,error:"商品データを読み込めませんでした"}, cb);
+  }
+}
+
+function jsonpResponse_(value, cb) {
+  const json = JSON.stringify(value);
+  if (cb && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(cb)) {
+    return ContentService.createTextOutput(cb + "(" + json + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {

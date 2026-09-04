@@ -1,5 +1,7 @@
 const $=id=>document.getElementById(id);
 const KEY='hacchu.db.v3', GAS_KEY='hacchu.gas.url', LOC_KEY='hacchu.loc';
+const CATALOG_PATH_KEY='hacchu.catalog.path', CATALOG_TOKEN_KEY='hacchu.catalog.token';
+const DEFAULT_CATALOG_PATH='発注アプリ資料/2026-09/構造化データ/商品マスタ_2026-09-04.json';
 const Storage=window.HacchuStorage;
 const DEFAULT_LOC={lat:36.1214,lon:139.6015,name:'加須市(埼玉県)'};
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwU6-Ut_7ChPXtVr5fOEq5iPd7m0G5VNkcMJ8g27XQ_aBv2t0S-WUJNtmtoUYDqyZ4V/exec';
@@ -240,6 +242,78 @@ function getGasUrl(){
   return !saved||saved===LEGACY_GAS_URL||saved===PREVIOUS_GAS_URL?DEFAULT_GAS_URL:saved;
 }
 function saveGasUrl(){const u=$('gas_url').value.trim();localStorage.setItem(GAS_KEY,u);flash('同期URL保存');alert('同期URLを設定しました')}
+
+function persistCatalogSource(){
+  const path=$('catalog_path').value.trim(),token=$('catalog_token').value.trim();
+  if(!path)throw new Error('Google Driveの読取パスを入力してください');
+  localStorage.setItem(CATALOG_PATH_KEY,path);
+  if(token)localStorage.setItem(CATALOG_TOKEN_KEY,token);else localStorage.removeItem(CATALOG_TOKEN_KEY);
+}
+function saveCatalogSource(){
+  try{persistCatalogSource()}catch(e){alert(e.message);return}
+  flash('商品データ読取設定を保存');alert('商品データの読取設定を保存しました');
+}
+
+function fetchDriveCatalog(timeoutMs=15000){
+  return new Promise((resolve,reject)=>{
+    const url=getGasUrl(),path=localStorage.getItem(CATALOG_PATH_KEY)||DEFAULT_CATALOG_PATH;
+    const token=localStorage.getItem(CATALOG_TOKEN_KEY)||'';
+    if(!url)return reject(new Error('GAS URLが未設定です'));
+    if(!token)return reject(new Error('商品データのアクセスキーが未設定です'));
+    const cb='gasCatalog_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');let done=false;
+    const finish=(fn,value)=>{if(done)return;done=true;clearTimeout(timer);delete window[cb];if(script.parentNode)script.parentNode.removeChild(script);fn(value)};
+    const timer=setTimeout(()=>finish(reject,new Error('商品データの読込がタイムアウトしました')),timeoutMs);
+    window[cb]=data=>data&&data.ok===false
+      ?finish(reject,new Error(data.error||'商品データを読み込めませんでした'))
+      :finish(resolve,data);
+    script.onerror=()=>finish(reject,new Error('商品データの読込に失敗しました'));
+    const qs=new URLSearchParams({mode:'catalog',path,token,callback:cb,t:String(Date.now())});
+    script.src=url+(url.includes('?')?'&':'?')+qs.toString();
+    document.body.appendChild(script);
+  });
+}
+
+function catalogGenreKey(name){
+  const aliases={'冷し麺':'hiyashi','冷やし麺':'hiyashi'};
+  return aliases[name]||(GEN.find(([,label])=>label===name)||[])[0]||null;
+}
+
+function mergeDriveCatalog(data){
+  if(!data||!Array.isArray(data.categories))throw new Error('商品データの形式が正しくありません');
+  let added=0,updated=0,skipped=0;
+  data.categories.forEach(category=>{
+    const key=catalogGenreKey(category.name),g=key&&DB.g[key];
+    if(!g||!Array.isArray(category.products)){skipped+=(category.products||[]).length;return}
+    const seen=new Set();
+    category.products.forEach(x=>{
+      const name=String(x.name||'').trim(),priceIn=Number(x.price),margin=Number(x.margin),nx=normName(name);
+      if(!name||!Number.isFinite(priceIn)||!Number.isFinite(margin)||seen.has(nx)){skipped++;return}
+      seen.add(nx);
+      let r=g.items.find(it=>{const ni=normName(it.name);return ni===nx||(Math.min(ni.length,nx.length)>=6&&(ni.includes(nx)||nx.includes(ni)))});
+      if(r){r.priceIn=priceIn;r.price=Math.round(priceIn/1.08);r.margin=margin;updated++}
+      else{
+        g.items.push({id:'drv'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),name,price:Math.round(priceIn/1.08),priceIn,margin,day:0,unit:1,grade:'○',my:0,tag:'',memo:'Drive商品マスタ '+(data.businessDate||'')});
+        added++;
+      }
+    });
+  });
+  return{added,updated,skipped};
+}
+
+async function loadDriveCatalog(){
+  try{persistCatalogSource()}catch(e){alert(e.message);return}
+  const btn=$('catalogLoadBtn');if(btn)btn.disabled=true;
+  try{
+    const data=await fetchDriveCatalog();
+    const count=(data.categories||[]).reduce((n,c)=>n+(c.products||[]).length,0);
+    if(!confirm(`Driveの商品データ${count}件を取り込みます。\n同名商品は税込価格・値入率を更新し、新商品は追加します。よろしいですか？`))return;
+    const result=mergeDriveCatalog(data);save();renderAll();
+    $('catalog_status').textContent=`読込済み: 更新${result.updated}件・追加${result.added}件`;
+    alert(`商品データを取り込みました。\n更新 ${result.updated}件 / 追加 ${result.added}件 / 対象外 ${result.skipped}件`);
+  }catch(e){$('catalog_status').textContent='読込失敗: '+e.message;alert(e.message)}
+  finally{if(btn)btn.disabled=false}
+}
 
 function fetchCloudDb(timeoutMs=10000){
   return new Promise((resolve,reject)=>{
@@ -1693,6 +1767,8 @@ function renderSet(){const g=G(),B=$('setbody');B.textContent='';
   $('s_base').value=g.base||'';$('s_up').value=g.up||1;$('gas_url').value=getGasUrl();
   $('s_shelf').value=g.shelf||'';$('s_cycle').value=g.cycle||'';$('s_binnote').value=g.binNote||'';
   $('s_margin').value=g.margin??'';
+  $('catalog_path').value=localStorage.getItem(CATALOG_PATH_KEY)||DEFAULT_CATALOG_PATH;
+  $('catalog_token').value=localStorage.getItem(CATALOG_TOKEN_KEY)||'';
   $('loc_status').textContent='現在の地域: '+getLoc().name;
   renderMemoDisplaySetting();renderMemos();renderBinMx();
   const sug=suggestBase();
