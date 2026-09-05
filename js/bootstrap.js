@@ -9,7 +9,7 @@ const app = document.createElement('script');
 app.src = './app.js?v=2026090504';
 app.onload = () => {
   const guide = document.createElement('script');
-  guide.src = './js/weekly-sample-guide.js?v=2026090501';
+  guide.src = './js/weekly-sample-guide.js?v=2026090502';
   guide.onload = () => {
     const select = document.getElementById('wkAiType');
     if (select && window.renderWeeklySample) window.renderWeeklySample(select.value);
