@@ -1956,7 +1956,7 @@ function addDriveFiles(files){
     const key=driveFileKey(file);
     if(existing.has(key))return;
     existing.add(key);
-    DRIVE_FILES.push({file,category:'unclassified'});
+    DRIVE_FILES.push({file});
     if(file.type&&file.type.startsWith('image/'))LAST_CAPTURED_FILE=file;
   });
   renderDriveFiles();
@@ -1966,8 +1966,37 @@ function bytesToBase64(buf){
   for(let i=0;i<bytes.length;i+=chunk)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+chunk,bytes.length)));
   return btoa(out);
 }
+function driveCategoryLabel(){
+  const el=$('driveCategory');
+  return el&&el.selectedOptions&&el.selectedOptions[0]?el.selectedOptions[0].textContent:'未分類';
+}
+function fetchDriveUploadStatus(requestId,timeoutMs=10000){
+  return new Promise((resolve,reject)=>{
+    const url=getGasUrl(),cb='gasUpload_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');let done=false;
+    const finish=(fn,value)=>{if(done)return;done=true;clearTimeout(timer);delete window[cb];if(script.parentNode)script.parentNode.removeChild(script);fn(value)};
+    const timer=setTimeout(()=>finish(reject,new Error('保存確認がタイムアウトしました')),timeoutMs);
+    window[cb]=data=>finish(resolve,data);
+    script.onerror=()=>finish(reject,new Error('保存確認に失敗しました'));
+    script.src=url+(url.includes('?')?'&':'?')+'mode=upload_status&id='+encodeURIComponent(requestId)+'&callback='+cb+'&t='+Date.now();
+    document.body.appendChild(script);
+  });
+}
+async function verifyDriveUpload(requestId){
+  let lastError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const data=await fetchDriveUploadStatus(requestId);
+      if(data&&data.ok)return data;
+      lastError=new Error('Driveで保存を確認できませんでした');
+    }catch(e){lastError=e}
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,700));
+  }
+  throw lastError||new Error('Driveで保存を確認できませんでした');
+}
 async function uploadDriveFiles(){
-  const url=getGasUrl(),month=$('driveMonth')?.value;
+  const url=getGasUrl(),month=$('driveMonth')?.value,category=$('driveCategory')?.value||'unclassified';
+  const categoryLabel=driveCategoryLabel();
   if(!url){alert('先に設定でGAS URLを確認してください');return}
   if(!month){alert('対象月を選択してください');return}
   if(!DRIVE_FILES.length){alert('画像またはPDFを選択してください');return}
@@ -1978,16 +2007,18 @@ async function uploadDriveFiles(){
     for(const entry of pending){
       msg.textContent=`送信中 ${done+1}/${pending.length}：${entry.file.name}`;
       const data=bytesToBase64(await entry.file.arrayBuffer());
+      const requestId=entry.requestId||(entry.requestId=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));
       await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
-        mode:'upload',month,category:'unclassified',name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data
+        mode:'upload',month,category,name:entry.file.name,mimeType:entry.file.type||'application/octet-stream',data,requestId
       })});
+      await verifyDriveUpload(requestId);
       done++;
       const index=DRIVE_FILES.indexOf(entry);
       if(index>=0)DRIVE_FILES.splice(index,1);
       renderDriveFiles();
     }
-    msg.className='note ok';msg.textContent=`✓ ${done}件を送信しました。Drive側で保存を確認してください。`;
-  }catch(e){msg.className='note crit';msg.textContent=`⚠ ${done}件送信後に停止しました。通信を確認して再実行してください。`}
+    msg.className='note ok';msg.textContent=`✓ ${done}件を「${categoryLabel}」へ保存確認しました。`;
+  }catch(e){msg.className='note crit';msg.textContent=`⚠ ${done}件は保存確認済み。残りは未確認です。通信を確認して再実行してください。`}
   finally{btn.disabled=false}
 }
 function initDriveImport(){

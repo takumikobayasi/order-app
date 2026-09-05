@@ -136,13 +136,22 @@
 <h2>今月の資料をGoogle Driveへ保存</h2>
 <div class="fg g2">
 <div><label>対象月</label><input id=driveMonth type=month></div>
-<div><label>保存先</label><span class=note>対象月の「未仕分け」フォルダへ保存</span></div>
+<div><label>画面種類（保存先）</label><select id=driveCategory>
+<option value=mon_timeseries>日別販売実績グラフ（中分類）</option>
+<option value=tue_assortment>品揃え状況確認・修正</option>
+<option value=category_totals>中分類総数</option>
+<option value=sales_ranking>売上ランキング</option>
+<option value=new_product>新商品案内明細</option>
+<option value=daily_item_sales>日別販売実績表（単品）</option>
+<option value=promotion>販促・商品資料</option>
+<option value=unclassified>未分類</option>
+</select></div>
 </div>
 <label class="btn-label sm" for=driveFiles>画像・PDFを選択</label>
 <input id=driveFiles type=file accept="image/*,.pdf,application/pdf" multiple hidden>
 <div id=driveFileList class=drive-file-list></div>
 <div class=btns style="margin-top:8px"><button class=sm id=driveUploadBtn onclick="uploadDriveFiles()">Google Driveへ保存</button></div>
-<p class=note id=driveMsg>選択したファイルは、GAS更新後にGoogle Driveの月別「未仕分け」フォルダへ保存されます。</p>
+<p class=note id=driveMsg>写真をまとめて選ぶと、対象月の画面種類別フォルダへ保存します。</p>
 </div>
 <div class=card>
 <h2>カメラ取り込み（写真→AI→貼り付け）</h2>
